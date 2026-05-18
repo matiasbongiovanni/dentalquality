@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 const crypto = require('crypto');
 const { validateAgendamiento } = require('./_lib/validate');
 
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar';
+const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Método no permitido' });
     }
 
-    const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
+    const N8N_WEBHOOK_URL = (process.env.N8N_WEBHOOK_URL || '').trim();
     if (!N8N_WEBHOOK_URL) {
         return res.status(500).json({ error: 'N8N_WEBHOOK_URL no configurada' });
     }
@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
     };
 
     const headers = { 'Content-Type': 'application/json' };
-    const secret = process.env.N8N_WEBHOOK_SECRET;
+    const secret = (process.env.N8N_WEBHOOK_SECRET || '').trim();
     if (secret) {
         const sig = crypto
             .createHmac('sha256', secret)

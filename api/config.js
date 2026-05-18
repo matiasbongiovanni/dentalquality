@@ -1,4 +1,4 @@
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar';
+const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
 
 module.exports = (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);

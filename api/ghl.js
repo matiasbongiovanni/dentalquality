@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 const { isAllowed } = require('./_lib/ghlAllowlist');
 
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar';
+const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -14,7 +14,7 @@ module.exports = async (req, res) => {
         return;
     }
 
-    const GHL_API_KEY = process.env.GHL_API_KEY;
+    const GHL_API_KEY = (process.env.GHL_API_KEY || '').trim();
     if (!GHL_API_KEY) {
         return res.status(500).json({ error: 'GHL_API_KEY no configurada' });
     }
