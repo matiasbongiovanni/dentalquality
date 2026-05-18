@@ -14,17 +14,21 @@
 </head>
 <body>
     <div class="container">
+
+        <!-- Header -->
         <div class="header-brand">
-            <img src="clinica-dental1.png" alt="MGV Dental" class="brand-logo" onerror="this.style.display='none'">
-            <h1>MGV Dental</h1>
-            <p class="subtitle">Agenda tu cita en simples pasos</p>
+            <div class="header-top">
+                <img src="clinica-dental1.png" alt="MGV Dental" class="brand-logo" onerror="this.style.display='none'">
+                <h1>MGV Dental</h1>
+            </div>
+            <p class="subtitle">Cuidamos tu sonrisa</p>
         </div>
 
         <!-- Tabs -->
         <div class="tabs-container">
             <div class="nav-buttons-container">
-                <button class="nav-button active" data-tab="agendar" onclick="selectTab('agendar')">Agendar Turno</button>
-                <button class="nav-button" data-tab="misturnos" onclick="selectTab('misturnos')">Mis Turnos</button>
+                <button class="nav-button active" data-tab="agendar" onclick="selectTab('agendar')">Agendar</button>
+                <button class="nav-button" data-tab="misturnos" onclick="selectTab('misturnos')">Ver Turnos</button>
             </div>
         </div>
 
@@ -33,38 +37,38 @@
 
             <!-- Selector de modo -->
             <div class="booking-mode-container">
-                <p class="mode-label">¿Cómo querés buscar turno?</p>
+                <p class="mode-label">Seleccioná primero la sede y luego el profesional para agendar tu cita</p>
                 <div class="mode-buttons-row">
                     <button type="button" class="mode-btn active" id="btnModeEsp" onclick="setBookingMode('especialidad')">
                         <span class="mode-icon">🦷</span>
-                        <span>Por Especialidad</span>
+                        Por Especialidad
                     </button>
                     <button type="button" class="mode-btn" id="btnModeProf" onclick="setBookingMode('profesional')">
                         <span class="mode-icon">👨‍⚕️</span>
-                        <span>Por Profesional</span>
+                        Por Profesional
                     </button>
                 </div>
             </div>
 
             <!-- Step 1: Por Especialidad -->
             <div id="step1-especialidad">
-                <h2 class="section-title">1. Seleccioná la especialidad</h2>
+                <h2 class="section-title">Agendar Cita</h2>
                 <select id="especialidadSelect" class="form-select" onchange="onEspecialidadChange()">
                     <option value="">Cargando especialidades...</option>
                 </select>
             </div>
 
-            <!-- Step 1: Por Profesional -->
+            <!-- Step 1: Por Profesional — cards grid -->
             <div id="step1-profesional" style="display:none;">
-                <h2 class="section-title">1. Seleccioná el profesional</h2>
-                <select id="profesionalSelect" class="form-select" onchange="onProfesionalChange()">
-                    <option value="">Cargando profesionales...</option>
-                </select>
+                <h2 class="section-title">Agendar Cita</h2>
+                <div id="profGridContainer">
+                    <p class="placeholder-text" style="text-align:center;padding:1.5rem;">Cargando profesionales...</p>
+                </div>
             </div>
 
             <!-- Formulario de agendamiento -->
             <div id="agendarFormContainer" style="display:none;">
-                <h2 class="section-title" style="margin-top:2rem;">2. Completá tus datos</h2>
+                <h2 class="section-title" style="margin-top:2rem;">Completá tus datos</h2>
 
                 <form id="agendarForm" class="form-grid">
                     <!-- DNI -->
@@ -81,7 +85,7 @@
                                 autocomplete="off"
                                 maxlength="8"
                             >
-                            <span id="dniLookupStatus" style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);font-size:0.85rem;color:var(--text-secondary);pointer-events:none;"></span>
+                            <span id="dniLookupStatus" style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);font-size:0.82rem;color:var(--text-secondary);pointer-events:none;"></span>
                         </div>
                     </div>
 
@@ -151,7 +155,7 @@
                         </select>
                     </div>
 
-                    <h2 class="section-title full-width" style="margin-top:0.5rem;">3. Elegí el horario</h2>
+                    <h2 class="section-title full-width" style="margin-top:0.5rem;">Elegí el horario</h2>
 
                     <div class="form-group full-width">
                         <label class="form-label">Días Disponibles <span class="required">*</span></label>
@@ -173,7 +177,7 @@
                         <input type="hidden" id="appointmentTime" required>
                     </div>
 
-                    <div class="form-group full-width" style="margin-top:1.5rem;">
+                    <div class="form-group full-width" style="margin-top:1rem;">
                         <button type="submit" class="save-button" id="submitBtn">Confirmar Turno</button>
                         <div id="agendarStatus" class="status-msg"></div>
                     </div>
@@ -183,7 +187,7 @@
 
         <!-- Tab: Mis Turnos -->
         <div id="tab-misturnos" class="tab-content">
-            <h2 class="section-title">Consultar mis turnos</h2>
+            <h2 class="section-title">Ver mis turnos</h2>
             <p class="subtitle-sm">Seleccioná tu sede e ingresá tu DNI para ver, reagendar o cancelar tus turnos.</p>
             <div class="form-group" style="margin-bottom:1rem;">
                 <label class="form-label">Sede <span class="required">*</span></label>
@@ -210,9 +214,9 @@
 
     <!-- Modal Éxito -->
     <div id="successModal" class="modal-overlay">
-        <div class="modal-content" style="text-align:center;max-width:400px;">
+        <div class="modal-content" style="text-align:center;max-width:380px;">
             <div class="success-icon">✓</div>
-            <h3>¡Turno Agendado con éxito!</h3>
+            <h3>¡Turno agendado!</h3>
             <p class="subtitle-sm">Te enviaremos los detalles a tu WhatsApp.</p>
             <button class="save-button" onclick="cerrarModal('successModal')">Entendido</button>
         </div>

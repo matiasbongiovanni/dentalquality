@@ -198,30 +198,52 @@ async function cargarEspecialidades() {
 // 1B. CARGAR PROFESIONALES (desde Supabase)
 // =============================================
 async function cargarProfesionalesSelect() {
-    const select = document.getElementById('profesionalSelect');
+    const container = document.getElementById('profGridContainer');
     if (profesionalesCache.length) {
-        poblarSelectProfesionales(select);
+        poblarSelectProfesionales();
         return;
     }
-    select.innerHTML = '<option value="">Cargando profesionales...</option>';
+    if (container) container.innerHTML = '<p class="placeholder-text" style="text-align:center;padding:1.5rem;">Cargando profesionales...</p>';
     try {
         const data = await supaFetch('/profesionales?select=*&order=profesional.asc');
         profesionalesCache = data;
-        poblarSelectProfesionales(select);
+        poblarSelectProfesionales();
     } catch (e) {
         console.error(e);
-        select.innerHTML = '<option value="">Error al cargar profesionales</option>';
+        if (container) container.innerHTML = '<p class="placeholder-text" style="text-align:center;color:var(--danger);">Error al cargar profesionales.</p>';
     }
 }
 
-function poblarSelectProfesionales(select) {
-    select.innerHTML = '<option value="">Seleccioná un profesional</option>';
+function poblarSelectProfesionales() {
+    const container = document.getElementById('profGridContainer');
+    if (!container) return;
+
+    if (!profesionalesCache.length) {
+        container.innerHTML = '<p class="placeholder-text" style="text-align:center;padding:1.5rem;">No hay profesionales disponibles.</p>';
+        return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'prof-grid';
+
     profesionalesCache.forEach(prof => {
-        const opt = document.createElement('option');
-        opt.value = prof.calendar_id;
-        opt.textContent = `${prof.profesional}${prof.sede ? ' — ' + prof.sede : ''}`;
-        select.appendChild(opt);
+        const card = document.createElement('div');
+        card.className = 'prof-card';
+        card.dataset.calendarId = prof.calendar_id;
+        card.innerHTML = `
+            <div class="prof-card-name">${prof.profesional}</div>
+            ${prof.sede ? `<span class="prof-card-badge">Sede: ${prof.sede}</span>` : ''}
+        `;
+        card.onclick = () => {
+            document.querySelectorAll('.prof-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            onProfesionalCardSelected(prof);
+        };
+        grid.appendChild(card);
     });
+
+    container.innerHTML = '';
+    container.appendChild(grid);
 }
 
 // =============================================
@@ -234,17 +256,16 @@ function onEspecialidadChange() {
 }
 
 function onProfesionalChange() {
-    const calendarId = document.getElementById('profesionalSelect').value;
+    const calendarId = document.getElementById('profesionalSelect')?.value;
     if (!calendarId) { resetBookingForm(); return; }
     const prof = profesionalesCache.find(p => p.calendar_id === calendarId);
-    // Inferir especialidad del profesional para el select de tratamientos
-    if (prof) {
-        const primeraEsp = (prof.especialidades || '').split(',')[0].replace(/^-\s*/, '').trim().toLowerCase();
-        actualizarTratamientos(primeraEsp || '');
-    } else {
-        actualizarTratamientos('');
-    }
-    cargarSlotsCalendar(calendarId);
+    onProfesionalCardSelected(prof || { calendar_id: calendarId });
+}
+
+function onProfesionalCardSelected(prof) {
+    const primeraEsp = (prof.especialidades || '').split(',')[0].replace(/^-\s*/, '').trim().toLowerCase();
+    actualizarTratamientos(primeraEsp || '');
+    cargarSlotsCalendar(prof.calendar_id);
 }
 
 // =============================================
