@@ -155,6 +155,69 @@ h3 { margin-top: 0; }
 }
 
 /* =============================================
+   SEDE SELECTOR
+   ============================================= */
+.sede-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sede-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+}
+
+.sede-buttons {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.sede-btn {
+    padding: 0.35rem 1rem;
+    border: 1.5px solid var(--border-color);
+    border-radius: 9999px;
+    background: white;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.sede-btn:hover { border-color: var(--primary); color: var(--primary); }
+.sede-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+/* Prof — sede section header */
+.prof-sede-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 1rem 0 0.5rem;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.prof-sede-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+/* =============================================
    BOOKING MODE SELECTOR
    ============================================= */
 .booking-mode-container {
@@ -244,20 +307,28 @@ h3 { margin-top: 0; }
 }
 
 .esp-card-icon {
-    width: 52px;
-    height: 52px;
-    background: var(--secondary-light);
-    border-radius: 50%;
+    width: 54px;
+    height: 54px;
+    border: 1.5px solid var(--secondary);
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 0.65rem;
-    font-size: 1.5rem;
-    transition: background 0.18s;
+    margin: 0 auto 0.75rem;
+    color: var(--primary);
+    background: white;
+    transition: all 0.18s;
+}
+
+.esp-card:hover .esp-card-icon {
+    background: var(--secondary-light);
+    border-color: var(--secondary);
 }
 
 .esp-card.selected .esp-card-icon {
-    background: var(--secondary);
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
 }
 
 .esp-card-name {
@@ -311,15 +382,22 @@ h3 { margin-top: 0; }
 .prof-card-avatar {
     width: 44px;
     height: 44px;
-    background: linear-gradient(135deg, var(--primary) 0%, #2563eb 100%);
+    border: 1.5px solid var(--primary);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0 auto 0.6rem;
-    font-size: 1.1rem;
-    color: white;
+    font-size: 1rem;
+    color: var(--primary);
     font-weight: 700;
+    background: var(--primary-light);
+    transition: all 0.18s;
+}
+
+.prof-card.selected .prof-card-avatar {
+    background: var(--primary);
+    color: white;
 }
 
 .prof-card-name {
@@ -746,6 +824,9 @@ h3 { margin-top: 0; }
     .form-grid { grid-template-columns: 1fr; gap: 0.875rem; }
     .form-group.full-width, .full-width { grid-column: 1; }
     .form-input, .form-select { height: 48px; font-size: 1rem; }
+
+    /* Sede selector */
+    .sede-selector { flex-wrap: wrap; gap: 0.5rem; }
 
     /* Especialidad cards: 2 col on mobile */
     .esp-grid { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }

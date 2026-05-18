@@ -35,9 +35,19 @@
         <!-- Tab: Agendar -->
         <div id="tab-agendar" class="tab-content active">
 
+            <!-- Selector de sede -->
+            <div class="sede-selector">
+                <span class="sede-label">Sede</span>
+                <div class="sede-buttons">
+                    <button class="sede-btn active" data-sede="" onclick="setSede('')">Todas</button>
+                    <button class="sede-btn" data-sede="Lanus" onclick="setSede('Lanus')">Lanús</button>
+                    <button class="sede-btn" data-sede="Lomas" onclick="setSede('Lomas')">Lomas</button>
+                </div>
+            </div>
+
             <!-- Selector de modo -->
             <div class="booking-mode-container">
-                <p class="mode-label">Seleccioná primero la sede y luego el profesional para agendar tu cita</p>
+                <p class="mode-label">¿Cómo querés buscar tu turno?</p>
                 <div class="mode-buttons-row">
                     <button type="button" class="mode-btn active" id="btnModeEsp" onclick="setBookingMode('especialidad')">
                         <span class="mode-icon">🦷</span>

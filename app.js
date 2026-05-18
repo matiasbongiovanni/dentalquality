@@ -28,13 +28,62 @@ let bookingMode = 'especialidad'; // 'especialidad' | 'profesional'
 let profesionalesCache = []; // cache de profesionales de Supabase
 
 // =============================================
+// SVG ICONS (stroke-based, brand colors)
+// =============================================
+const SVG_ICONS = {
+    'odontologia-general': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2C9 2 6 4.2 6 7c0 2 .5 3.6 1 5.6L8.2 20c.3 1.4 1 1.5 1.4 1.5s1-.4 1.2-1.5l.2-.8.2.8c.2 1.1.8 1.5 1.2 1.5s1.1-.1 1.4-1.5L15 12.6c.5-2 1-3.6 1-5.6C16 4.2 15 2 12 2z"/>
+    </svg>`,
+
+    'estetica-dental': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 3C7.5 3 5 5 5 7.5c0 1.8.4 3.2.9 5L7.2 19c.3 1.3 1 1.5 1.3 1.5s.9-.4 1.1-1.4l.4-1.1.4 1.1c.2 1 .8 1.4 1.1 1.4s1-.2 1.3-1.5l1.3-6.5c.5-1.8.9-3.2.9-5C15 5 12.5 3 10 3z"/>
+        <line x1="18" y1="2" x2="18" y2="6"/>
+        <line x1="16" y1="4" x2="20" y2="4"/>
+        <line x1="21" y1="8.5" x2="21" y2="11.5"/>
+        <line x1="19.5" y1="10" x2="22.5" y2="10"/>
+    </svg>`,
+
+    'ortodoncia-alineadores': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 3C5.3 3 4 4.5 4 6.3c0 1.3.3 2.3.6 3.6L5.5 14c.2.9.7 1 1 1s.6-.3.8-1l.2-.6.2.6c.2.7.5 1 .8 1s.8-.1 1-1l.9-4.1c.3-1.3.6-2.3.6-3.6C11 4.5 8.7 3 7 3z"/>
+        <path d="M17 3c-1.7 0-3 1.5-3 3.3 0 1.3.3 2.3.6 3.6L15.5 14c.2.9.7 1 1 1s.6-.3.8-1l.2-.6.2.6c.2.7.5 1 .8 1s.8-.1 1-1l.9-4.1c.3-1.3.6-2.3.6-3.6C21 4.5 18.7 3 17 3z"/>
+        <line x1="4" y1="8.8" x2="21" y2="8.8"/>
+        <rect x="5.5" y="7.8" width="2.5" height="2" rx="0.4"/>
+        <rect x="15.5" y="7.8" width="2.5" height="2" rx="0.4"/>
+    </svg>`,
+
+    'implantes-protesis': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 2.5C6 2.5 4 4.2 4 6.5c0 1.5.3 2.6.7 4L5.5 13h13l.8-2.5c.4-1.4.7-2.5.7-4C20 4.2 18 2.5 16 2.5"/>
+        <line x1="12" y1="13" x2="12" y2="21"/>
+        <line x1="9.5" y1="15.5" x2="14.5" y2="15.5"/>
+        <line x1="9.5" y1="17.5" x2="14.5" y2="17.5"/>
+        <line x1="9.5" y1="19.5" x2="14.5" y2="19.5"/>
+    </svg>`,
+
+    'atm-bruxismo': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 9h14c0-3-2-5-4-5H9C7 4 5 6 5 9z"/>
+        <path d="M5 15h14c0 3-2 5-4 5H9c-2 0-4-2-4-5z"/>
+        <line x1="9" y1="4" x2="9" y2="9"/>
+        <line x1="12" y1="4" x2="12" y2="9"/>
+        <line x1="15" y1="4" x2="15" y2="9"/>
+        <line x1="9" y1="15" x2="9" y2="20"/>
+        <line x1="12" y1="15" x2="12" y2="20"/>
+        <line x1="15" y1="15" x2="15" y2="20"/>
+        <line x1="5" y1="12" x2="19" y2="12" stroke-width="1.2" stroke-dasharray="2.5 2"/>
+    </svg>`,
+
+    'odontopediatria': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 7C10 7 8 8.5 8 10.5c0 1.5.3 2.5.7 4l.9 5c.3 1.2.9 1.3 1.2 1.3s.8-.3 1-1.1l.2-.6.2.6c.2.8.7 1.1 1 1.1s.9-.1 1.2-1.3l.9-5c.4-1.5.7-2.5.7-4C16 8.5 14 7 12 7z"/>
+        <path d="M9.5 5C9.2 4.2 8.3 3.8 7.7 4.3c-.7.6-.5 1.5.4 2.3C8.8 7.2 9.5 7.5 10 7.7c.1 0 .1 0 .5-.2.5-.3 1.2-.7 1.8-1.2.9-.8 1.1-1.7.4-2.3C12.1 3.5 11 3.8 10.5 5"/>
+    </svg>`
+};
+
+// =============================================
 // ESPECIALIDADES (hardcoded)
 // =============================================
 const ESPECIALIDADES = [
     {
         id: 'odontologia-general',
         label: 'Odontología General',
-        icon: '🦷',
         desc: 'Consultas, limpiezas y caries',
         searchKey: 'odontolog',
         tratamientos: ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración']
@@ -42,7 +91,6 @@ const ESPECIALIDADES = [
     {
         id: 'estetica-dental',
         label: 'Estética Dental',
-        icon: '✨',
         desc: 'Blanqueamiento, carillas y diseño de sonrisa',
         searchKey: 'estet',
         tratamientos: ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa', 'Consulta estética']
@@ -50,7 +98,6 @@ const ESPECIALIDADES = [
     {
         id: 'ortodoncia-alineadores',
         label: 'Ortodoncia y Alineadores',
-        icon: '😁',
         desc: 'Brackets, Invisalign y corrección dental',
         searchKey: 'ortodon',
         tratamientos: ['Consulta inicial de ortodoncia', 'Colocación de brackets', 'Control de ortodoncia', 'Alineadores (Invisalign)', 'Retención post-tratamiento']
@@ -58,7 +105,6 @@ const ESPECIALIDADES = [
     {
         id: 'implantes-protesis',
         label: 'Implantes y Prótesis',
-        icon: '🔩',
         desc: 'Implantes, coronas y prótesis dentales',
         searchKey: 'implant',
         tratamientos: ['Consulta de implantes', 'Colocación de implante', 'Control post-operatorio', 'Corona sobre implante', 'Consulta de prótesis', 'Prótesis fija', 'Prótesis removible', 'Prótesis total']
@@ -66,7 +112,6 @@ const ESPECIALIDADES = [
     {
         id: 'atm-bruxismo',
         label: 'ATM · Bruxismo',
-        icon: '😮',
         desc: 'Dolor mandibular y apretamiento dental',
         searchKey: 'atm',
         tratamientos: ['Consulta ATM', 'Diagnóstico de bruxismo', 'Placa miorelajante', 'Control de placa', 'Tratamiento de ATM']
@@ -74,7 +119,6 @@ const ESPECIALIDADES = [
     {
         id: 'odontopediatria',
         label: 'Odontopediatría y Ortopediatría',
-        icon: '👶',
         desc: 'Atención dental y ortopédica para niños',
         searchKey: 'pediatr',
         tratamientos: ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil', 'Aparatología removible', 'Ortopedia maxilar']
@@ -82,6 +126,17 @@ const ESPECIALIDADES = [
 ];
 
 let especialidadSeleccionada = null;
+let sedeSeleccionada = '';
+
+function setSede(sede) {
+    sedeSeleccionada = sede;
+    document.querySelectorAll('.sede-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.sede-btn[data-sede="${sede}"]`)?.classList.add('active');
+    resetBookingForm();
+    if (bookingMode === 'profesional' && profesionalesCache.length) {
+        poblarSelectProfesionales();
+    }
+}
 
 function renderEspecialidadCards() {
     const container = document.getElementById('espGridContainer');
@@ -93,7 +148,7 @@ function renderEspecialidadCards() {
         card.className = 'esp-card';
         card.dataset.id = esp.id;
         card.innerHTML = `
-            <div class="esp-card-icon">${esp.icon}</div>
+            <div class="esp-card-icon">${SVG_ICONS[esp.id] || ''}</div>
             <div class="esp-card-name">${esp.label}</div>
             <div class="esp-card-desc">${esp.desc}</div>
         `;
@@ -243,34 +298,57 @@ function poblarSelectProfesionales() {
     const container = document.getElementById('profGridContainer');
     if (!container) return;
 
-    if (!profesionalesCache.length) {
-        container.innerHTML = '<p class="placeholder-text" style="text-align:center;padding:1.5rem;">No hay profesionales disponibles.</p>';
+    let profs = profesionalesCache;
+    if (sedeSeleccionada) profs = profs.filter(p => (p.sede || '') === sedeSeleccionada);
+
+    if (!profs.length) {
+        container.innerHTML = '<p class="placeholder-text" style="text-align:center;padding:1.5rem;">No hay profesionales para esta sede.</p>';
         return;
     }
 
-    const grid = document.createElement('div');
-    grid.className = 'prof-grid';
-
-    profesionalesCache.forEach(prof => {
-        const card = document.createElement('div');
-        card.className = 'prof-card';
-        card.dataset.calendarId = prof.calendar_id;
-        const inicial = (prof.profesional || '?').replace(/^(Dr|Dra)\.?\s*/i, '').trim()[0] || '?';
-        card.innerHTML = `
-            <div class="prof-card-avatar">${inicial.toUpperCase()}</div>
-            <div class="prof-card-name">${prof.profesional}</div>
-            ${prof.sede ? `<span class="prof-card-badge">Sede: ${prof.sede}</span>` : ''}
-        `;
-        card.onclick = () => {
-            document.querySelectorAll('.prof-card').forEach(c => c.classList.remove('selected'));
-            card.classList.add('selected');
-            onProfesionalCardSelected(prof);
-        };
-        grid.appendChild(card);
+    // Agrupar por sede
+    const grupos = {};
+    profs.forEach(prof => {
+        const sede = prof.sede || 'Sin sede';
+        if (!grupos[sede]) grupos[sede] = [];
+        grupos[sede].push(prof);
     });
 
     container.innerHTML = '';
-    container.appendChild(grid);
+    const sedes = Object.keys(grupos).sort();
+
+    sedes.forEach(sede => {
+        // Header de sede (solo si hay más de una sede visible)
+        if (sedes.length > 1) {
+            const header = document.createElement('div');
+            header.className = 'prof-sede-header';
+            header.textContent = sede;
+            container.appendChild(header);
+        }
+
+        const grid = document.createElement('div');
+        grid.className = 'prof-grid';
+
+        grupos[sede].forEach(prof => {
+            const card = document.createElement('div');
+            card.className = 'prof-card';
+            card.dataset.calendarId = prof.calendar_id;
+            const inicial = (prof.profesional || '?').replace(/^(Dr|Dra)\.?\s*/i, '').trim()[0] || '?';
+            card.innerHTML = `
+                <div class="prof-card-avatar">${inicial.toUpperCase()}</div>
+                <div class="prof-card-name">${prof.profesional}</div>
+                ${prof.sede ? `<span class="prof-card-badge">${prof.sede}</span>` : ''}
+            `;
+            card.onclick = () => {
+                document.querySelectorAll('.prof-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                onProfesionalCardSelected(prof);
+            };
+            grid.appendChild(card);
+        });
+
+        container.appendChild(grid);
+    });
 }
 
 // =============================================
