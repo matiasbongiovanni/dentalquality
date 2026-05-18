@@ -19,13 +19,102 @@ async function initConfig() {
     }
 }
 
-
 // =============================================
 // ESTADO GLOBAL
 // =============================================
-let profesionalesData = [];
-let doctorSeleccionado = null;
 let disponibilidadGlobal = {};
+let slotSeleccionado = null;
+let bookingMode = 'especialidad'; // 'especialidad' | 'profesional'
+let profesionalesCache = []; // cache de profesionales de Supabase
+
+// =============================================
+// TRATAMIENTOS POR ESPECIALIDAD
+// =============================================
+const TRATAMIENTOS = {
+    'odontología general':  ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración'],
+    'odontologia general':  ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración'],
+    'general':              ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración'],
+    'ortodoncia':           ['Consulta inicial de ortodoncia', 'Colocación de brackets', 'Control de brackets', 'Ortodoncia invisible (Invisalign)', 'Retención post-tratamiento'],
+    'implantología':        ['Consulta de implantes', 'Colocación de implante', 'Control post-operatorio', 'Corona sobre implante'],
+    'implantologia':        ['Consulta de implantes', 'Colocación de implante', 'Control post-operatorio', 'Corona sobre implante'],
+    'endodoncia':           ['Tratamiento de conductos', 'Retratamiento de conductos', 'Urgencia endodóntica'],
+    'periodoncia':          ['Raspaje y alisado radicular', 'Tratamiento de encías', 'Cirugía periodontal', 'Control periodontal'],
+    'estética dental':      ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa'],
+    'estetica dental':      ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa'],
+    'estética':             ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa'],
+    'estetica':             ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa'],
+    'cirugía':              ['Extracción de muela del juicio', 'Cirugía de tejidos blandos', 'Frenectomía'],
+    'cirugia':              ['Extracción de muela del juicio', 'Cirugía de tejidos blandos', 'Frenectomía'],
+    'odontopediatría':      ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil', 'Aparatología removible'],
+    'odontopediatria':      ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil', 'Aparatología removible'],
+    'pediátrico':           ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil'],
+    'pediatrico':           ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil'],
+    'prótesis':             ['Consulta de prótesis', 'Prótesis fija', 'Prótesis removible', 'Prótesis total', 'Control de prótesis'],
+    'protesis':             ['Consulta de prótesis', 'Prótesis fija', 'Prótesis removible', 'Prótesis total', 'Control de prótesis'],
+    'radiología':           ['Radiografía periapical', 'Panorámica dental', 'Tomografía CBCT'],
+    'radiologia':           ['Radiografía periapical', 'Panorámica dental', 'Tomografía CBCT'],
+};
+const TRATAMIENTOS_FALLBACK = ['Consulta general', 'Control / Revisación', 'Urgencia', 'Otro'];
+
+function getTratamientosPorEspecialidad(esp) {
+    if (!esp) return TRATAMIENTOS_FALLBACK;
+    const lower = esp.toLowerCase().trim();
+    if (TRATAMIENTOS[lower]) return TRATAMIENTOS[lower];
+    // buscar si la especialidad contiene alguna clave o viceversa
+    for (const key of Object.keys(TRATAMIENTOS)) {
+        if (lower.includes(key) || key.includes(lower)) return TRATAMIENTOS[key];
+    }
+    return TRATAMIENTOS_FALLBACK;
+}
+
+function actualizarTratamientos(especialidad) {
+    const sel = document.getElementById('tratamiento');
+    if (!sel) return;
+    const lista = getTratamientosPorEspecialidad(especialidad);
+    sel.innerHTML = '<option value="">Seleccioná el tratamiento</option>';
+    lista.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        sel.appendChild(opt);
+    });
+}
+
+// =============================================
+// MODO DE AGENDAMIENTO
+// =============================================
+function setBookingMode(mode) {
+    bookingMode = mode;
+
+    document.getElementById('btnModeEsp').classList.toggle('active', mode === 'especialidad');
+    document.getElementById('btnModeProf').classList.toggle('active', mode === 'profesional');
+
+    const step1Esp = document.getElementById('step1-especialidad');
+    const step1Prof = document.getElementById('step1-profesional');
+
+    if (mode === 'especialidad') {
+        step1Esp.style.display = '';
+        step1Prof.style.display = 'none';
+    } else {
+        step1Esp.style.display = 'none';
+        step1Prof.style.display = '';
+        cargarProfesionalesSelect();
+    }
+
+    // Resetear form
+    resetBookingForm();
+}
+
+function resetBookingForm() {
+    disponibilidadGlobal = {};
+    slotSeleccionado = null;
+    document.getElementById('agendarFormContainer').style.display = 'none';
+    document.getElementById('appointmentDate').value = '';
+    document.getElementById('appointmentTime').value = '';
+    document.getElementById('timeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha para ver horarios.</p>';
+    document.getElementById('datePickerContainer').innerHTML = '<p class="placeholder-text">Cargando agenda...</p>';
+    document.getElementById('tratamiento').innerHTML = '<option value="">Seleccioná primero una especialidad</option>';
+}
 
 // =============================================
 // TABS
@@ -44,10 +133,12 @@ function cerrarModal(id) {
     document.getElementById(id)?.classList.remove('active');
     if (id === 'successModal') window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
 function scrollDates(dir) {
     const c = document.getElementById('datePickerContainer');
     if (c) c.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' });
 }
+
 function scrollRescheduleDates(dir) {
     const c = document.getElementById('rescheduleDatePicker');
     if (c) c.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' });
@@ -55,48 +146,27 @@ function scrollRescheduleDates(dir) {
 
 async function supaFetch(path) {
     const url = `${SUPABASE_URL}${path}`;
-    console.log('[Supa] GET', url);
     const res = await fetch(url, { headers: SUPABASE_HEADERS });
     const data = await res.json();
-    if (!res.ok) {
-        console.error('[Supa] Error:', res.status, data);
-        throw new Error(data.message || data.hint || data.details || `Error ${res.status}`);
-    }
+    if (!res.ok) throw new Error(data.message || data.hint || data.details || `Error ${res.status}`);
     return data;
 }
 
 async function ghlFetch(path, opts = {}) {
-    // Para Vercel, usamos la Serverless Function local (en la carpeta api/)
-    // Le pasamos el path de GHL como query parameter
     const PROXY_URL = '/api/ghl?path=';
-    
-    // Separar el path de los query params
     const [basePath, queryStr] = path.split('?');
     const finalUrl = `${PROXY_URL}${encodeURIComponent(basePath)}${queryStr ? '&' + queryStr : ''}`;
-    
-    console.log('[GHL] Llamando:', finalUrl);
-    try {
-        const res = await fetch(finalUrl, {
-            ...opts,
-            headers: {
-                ...opts.headers,
-                'Content-Type': 'application/json'
-            }
-        });
-        const json = await res.json().catch(() => ({}));
-        console.log('[GHL] Respuesta status:', res.status, json);
-        if (!res.ok) {
-            throw new Error(json.message || json.msg || `GHL Error ${res.status}`);
-        }
-        return json;
-    } catch (err) {
-        console.error('[GHL] Error de red:', err);
-        throw err;
-    }
+    const res = await fetch(finalUrl, {
+        ...opts,
+        headers: { ...opts.headers, 'Content-Type': 'application/json' }
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.message || json.msg || `GHL Error ${res.status}`);
+    return json;
 }
 
 // =============================================
-// 1. CARGAR ESPECIALIDADES (desde Supabase)
+// 1A. CARGAR ESPECIALIDADES (desde Supabase)
 // =============================================
 async function cargarEspecialidades() {
     const select = document.getElementById('especialidadSelect');
@@ -110,7 +180,7 @@ async function cargarEspecialidades() {
             });
         });
         const sorted = [...espSet].sort();
-        select.innerHTML = '<option value="">Selecciona una especialidad</option>';
+        select.innerHTML = '<option value="">Seleccioná una especialidad</option>';
         sorted.forEach(e => {
             const label = e.charAt(0).toUpperCase() + e.slice(1);
             const opt = document.createElement('option');
@@ -125,90 +195,173 @@ async function cargarEspecialidades() {
 }
 
 // =============================================
-// 2. CARGAR PROFESIONALES (desde Supabase)
+// 1B. CARGAR PROFESIONALES (desde Supabase)
 // =============================================
-async function cargarProfesionales() {
-    const especialidad = document.getElementById('especialidadSelect').value;
-    const container = document.getElementById('profesionalesContainer');
-    const formContainer = document.getElementById('agendarFormContainer');
-    doctorSeleccionado = null;
-    formContainer.style.display = 'none';
-
-    if (!especialidad) { container.style.display = 'none'; return; }
-
-    container.style.display = 'grid';
-    container.innerHTML = '<p class="loading-spinner" style="grid-column:1/-1;">Buscando profesionales...</p>';
-
+async function cargarProfesionalesSelect() {
+    const select = document.getElementById('profesionalSelect');
+    if (profesionalesCache.length) {
+        poblarSelectProfesionales(select);
+        return;
+    }
+    select.innerHTML = '<option value="">Cargando profesionales...</option>';
     try {
-        const data = await supaFetch(`/profesionales?select=*&especialidades=ilike.*${encodeURIComponent(especialidad)}*`);
-        profesionalesData = data;
-
-        if (!data.length) {
-            container.innerHTML = '<p class="no-results" style="grid-column:1/-1;">No hay profesionales para esta especialidad.</p>';
-            return;
-        }
-        container.innerHTML = '';
-        data.forEach(prof => {
-            const btn = document.createElement('div');
-            btn.className = 'doctor-button';
-            btn.innerHTML = `<div class="doctor-name">${prof.profesional}</div><div class="doctor-label">${prof.sede}</div>`;
-            btn.onclick = () => seleccionarDoctor(prof, btn);
-            container.appendChild(btn);
-        });
+        const data = await supaFetch('/profesionales?select=*&order=profesional.asc');
+        profesionalesCache = data;
+        poblarSelectProfesionales(select);
     } catch (e) {
-        container.innerHTML = '<p class="no-results" style="grid-column:1/-1;">Error al buscar profesionales.</p>';
+        console.error(e);
+        select.innerHTML = '<option value="">Error al cargar profesionales</option>';
     }
 }
 
-// =============================================
-// 3. SELECCIONAR DOCTOR Y CARGAR DISPONIBILIDAD
-// =============================================
-function seleccionarDoctor(prof, btnEl) {
-    doctorSeleccionado = prof;
-    document.querySelectorAll('.doctor-button').forEach(b => b.classList.remove('selected'));
-    if (btnEl) btnEl.classList.add('selected');
-
-    const formContainer = document.getElementById('agendarFormContainer');
-    document.getElementById('agendarDoctorInfo').textContent = `👨‍⚕️ ${prof.profesional} — ${prof.sede}`;
-    formContainer.style.display = 'block';
-    formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    document.getElementById('appointmentDate').value = '';
-    document.getElementById('appointmentTime').value = '';
-    document.getElementById('timeSlotsContainer').innerHTML = '<p class="placeholder-text">Selecciona una fecha para ver horarios.</p>';
-    cargarDisponibilidad();
+function poblarSelectProfesionales(select) {
+    select.innerHTML = '<option value="">Seleccioná un profesional</option>';
+    profesionalesCache.forEach(prof => {
+        const opt = document.createElement('option');
+        opt.value = prof.calendar_id;
+        opt.textContent = `${prof.profesional}${prof.sede ? ' — ' + prof.sede : ''}`;
+        select.appendChild(opt);
+    });
 }
 
 // =============================================
-// 4. CARGAR DISPONIBILIDAD (desde GHL)
+// HANDLERS DE SELECCIÓN
 // =============================================
-async function cargarDisponibilidad() {
-    const container = document.getElementById('datePickerContainer');
-    container.innerHTML = '<p class="placeholder-text" style="margin:auto;">Cargando agenda...</p>';
+function onEspecialidadChange() {
+    const especialidad = document.getElementById('especialidadSelect').value;
+    actualizarTratamientos(especialidad);
+    cargarSlotsEspecialidad(especialidad);
+}
+
+function onProfesionalChange() {
+    const calendarId = document.getElementById('profesionalSelect').value;
+    if (!calendarId) { resetBookingForm(); return; }
+    const prof = profesionalesCache.find(p => p.calendar_id === calendarId);
+    // Inferir especialidad del profesional para el select de tratamientos
+    if (prof) {
+        const primeraEsp = (prof.especialidades || '').split(',')[0].replace(/^-\s*/, '').trim().toLowerCase();
+        actualizarTratamientos(primeraEsp || '');
+    } else {
+        actualizarTratamientos('');
+    }
+    cargarSlotsCalendar(calendarId);
+}
+
+// =============================================
+// 2A. CARGAR SLOTS POR ESPECIALIDAD
+// =============================================
+async function cargarSlotsEspecialidad(especialidad) {
+    const formContainer = document.getElementById('agendarFormContainer');
+    const dateContainer = document.getElementById('datePickerContainer');
+
+    disponibilidadGlobal = {};
+    slotSeleccionado = null;
+    document.getElementById('appointmentDate').value = '';
+    document.getElementById('appointmentTime').value = '';
+    document.getElementById('timeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha para ver horarios.</p>';
+
+    if (!especialidad) {
+        formContainer.style.display = 'none';
+        return;
+    }
+
+    formContainer.style.display = 'block';
+    formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">Buscando turnos disponibles...</p>';
 
     try {
-        const calendarId = doctorSeleccionado.calendar_id;
+        const profs = await supaFetch(`/profesionales?select=*&especialidades=ilike.*${encodeURIComponent(especialidad)}*`);
+
+        if (!profs.length) {
+            dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">No hay profesionales para esta especialidad.</p>';
+            return;
+        }
+
         const now = Date.now();
         const end = now + 30 * 24 * 60 * 60 * 1000;
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const raw = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
-        console.log('[GHL] free-slots raw:', JSON.stringify(raw).substring(0, 500));
 
-        // GHL puede devolver { slots: { 'YYYY-MM-DD': [...] } } o directamente { 'YYYY-MM-DD': {...} }
-        if (raw && raw.slots && typeof raw.slots === 'object' && !Array.isArray(raw.slots)) {
-            disponibilidadGlobal = raw.slots;
-        } else if (raw && raw.data) {
-            disponibilidadGlobal = raw.data;
-        } else {
-            disponibilidadGlobal = raw;
-        }
+        const results = await Promise.all(profs.map(async prof => {
+            try {
+                const raw = await ghlFetch(`calendars/${prof.calendar_id}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
+                return parsearSlots(raw, prof);
+            } catch { return []; }
+        }));
 
-        console.log('[GHL] disponibilidadGlobal keys:', Object.keys(disponibilidadGlobal).slice(0, 5));
-        dibujarTarjetasDeDias(container);
+        poblarDisponibilidad(results.flat());
+        dibujarTarjetasDeDias(dateContainer);
     } catch (e) {
-        console.error('Disponibilidad error:', e);
-        container.innerHTML = `<p style="color:red;margin:auto;">Error: ${e.message}. Verifica que el proxy esté corriendo (node proxy.js)</p>`;
+        dateContainer.innerHTML = `<p style="color:var(--danger);margin:auto;">Error: ${e.message}</p>`;
     }
+}
+
+// =============================================
+// 2B. CARGAR SLOTS POR CALENDAR ID (profesional)
+// =============================================
+async function cargarSlotsCalendar(calendarId) {
+    const formContainer = document.getElementById('agendarFormContainer');
+    const dateContainer = document.getElementById('datePickerContainer');
+
+    disponibilidadGlobal = {};
+    slotSeleccionado = null;
+    document.getElementById('appointmentDate').value = '';
+    document.getElementById('appointmentTime').value = '';
+    document.getElementById('timeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha para ver horarios.</p>';
+
+    formContainer.style.display = 'block';
+    formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">Buscando turnos disponibles...</p>';
+
+    try {
+        const prof = profesionalesCache.find(p => p.calendar_id === calendarId);
+        const now = Date.now();
+        const end = now + 30 * 24 * 60 * 60 * 1000;
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        const raw = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
+        const slots = parsearSlots(raw, prof || { calendar_id: calendarId, profesional: 'Profesional', sede: '' });
+        poblarDisponibilidad([slots]);
+        dibujarTarjetasDeDias(dateContainer);
+    } catch (e) {
+        dateContainer.innerHTML = `<p style="color:var(--danger);margin:auto;">Error: ${e.message}</p>`;
+    }
+}
+
+// =============================================
+// HELPERS DE SLOTS
+// =============================================
+function parsearSlots(raw, prof) {
+    const slotsMap = raw?.slots || raw?.data || raw || {};
+    const collected = [];
+    Object.entries(slotsMap).forEach(([dateStr, dayData]) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+        const slots = dayData?.slots || dayData;
+        if (!Array.isArray(slots)) return;
+        slots.forEach(slot => {
+            const iso = typeof slot === 'string' ? slot : (slot.startTime || slot);
+            const d = new Date(iso);
+            if (!isNaN(d.getTime()) && d > new Date()) {
+                collected.push({
+                    iso, d, dateStr,
+                    profesional: prof.profesional,
+                    sede: prof.sede,
+                    calendarId: prof.calendar_id,
+                    calendarName: `${prof.profesional} - ${prof.sede}`
+                });
+            }
+        });
+    });
+    return collected;
+}
+
+function poblarDisponibilidad(allSlotsArrays) {
+    const allSlots = allSlotsArrays.flat().sort((a, b) => a.d - b.d);
+    disponibilidadGlobal = {};
+    allSlots.forEach(slot => {
+        if (!disponibilidadGlobal[slot.dateStr]) disponibilidadGlobal[slot.dateStr] = [];
+        const exists = disponibilidadGlobal[slot.dateStr].find(s => s.iso === slot.iso && s.calendarId === slot.calendarId);
+        if (!exists) disponibilidadGlobal[slot.dateStr].push(slot);
+    });
 }
 
 function dibujarTarjetasDeDias(container) {
@@ -220,8 +373,8 @@ function dibujarTarjetasDeDias(container) {
     let hayDias = false;
 
     fechas.forEach(dateStr => {
-        const slots = disponibilidadGlobal[dateStr]?.slots || disponibilidadGlobal[dateStr];
-        if (!Array.isArray(slots) || slots.length === 0) return;
+        const slots = disponibilidadGlobal[dateStr];
+        if (!slots || !slots.length) return;
         hayDias = true;
         const [y, m, d] = dateStr.split('-');
         const dateObj = new Date(y, m - 1, d);
@@ -233,81 +386,89 @@ function dibujarTarjetasDeDias(container) {
         container.appendChild(card);
     });
 
-    if (!hayDias) container.innerHTML = '<p class="placeholder-text" style="margin:auto;">No hay días disponibles en los próximos 60 días.</p>';
+    if (!hayDias) container.innerHTML = '<p class="placeholder-text" style="margin:auto;">No hay días disponibles en los próximos 30 días.</p>';
 }
 
 // =============================================
-// 5. SELECCIONAR FECHA Y HORARIOS
+// 3. SELECCIONAR FECHA Y HORARIOS
 // =============================================
 function seleccionarFecha(dateStr, cardEl) {
     document.getElementById('appointmentDate').value = dateStr;
     document.getElementById('appointmentTime').value = '';
+    slotSeleccionado = null;
     document.querySelectorAll('#datePickerContainer .date-card').forEach(c => c.classList.remove('selected'));
     if (cardEl) cardEl.classList.add('selected');
 
-    const slotsData = disponibilidadGlobal[dateStr]?.slots || disponibilidadGlobal[dateStr];
+    const slotsData = disponibilidadGlobal[dateStr] || [];
     const container = document.getElementById('timeSlotsContainer');
     container.innerHTML = '';
 
-    if (!Array.isArray(slotsData) || slotsData.length === 0) {
+    if (!slotsData.length) {
         container.innerHTML = '<p class="placeholder-text">No hay horarios para esta fecha.</p>';
         return;
     }
 
-    const parsed = [];
-    slotsData.forEach(slot => {
-        const d = new Date(typeof slot === 'string' ? slot : (slot.startTime || slot));
-        if (isNaN(d.getTime())) return;
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mm = String(d.getMinutes()).padStart(2, '0');
-        const tv = `${hh}:${mm}`;
-        if (!parsed.find(s => s.tv === tv)) parsed.push({ tv, iso: typeof slot === 'string' ? slot : (slot.startTime || slot), d });
-    });
-    parsed.sort((a, b) => a.d - b.d);
+    const seen = new Set();
+    const parsed = slotsData
+        .filter(slot => {
+            if (seen.has(slot.iso)) return false;
+            seen.add(slot.iso);
+            return true;
+        })
+        .sort((a, b) => a.d - b.d);
 
-    parsed.forEach(s => {
+    parsed.forEach(slot => {
+        const hh = String(slot.d.getHours()).padStart(2, '0');
+        const mm = String(slot.d.getMinutes()).padStart(2, '0');
         const btn = document.createElement('div');
         btn.className = 'time-slot-btn';
-        btn.textContent = s.tv;
+        btn.textContent = `${hh}:${mm}`;
         btn.onclick = () => {
             container.querySelectorAll('.time-slot-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
-            document.getElementById('appointmentTime').value = s.iso;
+            document.getElementById('appointmentTime').value = slot.iso;
+            slotSeleccionado = slot;
         };
         container.appendChild(btn);
     });
 }
 
 // =============================================
-// 6. AGENDAR TURNO (GHL API directo)
+// 4. AGENDAR TURNO
 // =============================================
 document.getElementById('agendarForm')?.addEventListener('submit', async function (e) {
     e.preventDefault();
     const status = document.getElementById('agendarStatus');
     const submitBtn = document.getElementById('submitBtn');
 
-    const nombre = document.getElementById('nombre').value.trim();
-    const apellido = document.getElementById('apellido').value.trim();
-    const dni = document.getElementById('dni').value.trim();
-    const telefono = document.getElementById('telefono').value.trim();
-    const motivo = document.getElementById('motivo').value.trim();
-    const obraSocial = (document.getElementById('obraSocial')?.value || '').trim();
-    const fecha = document.getElementById('appointmentDate').value;
+    const nombre    = document.getElementById('nombre').value.trim();
+    const apellido  = document.getElementById('apellido').value.trim();
+    const dni       = document.getElementById('dni').value.trim();
+    const telRaw    = document.getElementById('telefono').value.replace(/\D/g, '');
+    const telefono  = '549' + telRaw;
+    const obraSocial = document.getElementById('obraSocial')?.value || '';
+    const tratamiento = document.getElementById('tratamiento').value.trim();
     const startTime = document.getElementById('appointmentTime').value;
 
-    if (!nombre || !apellido || !dni || !telefono) {
-        status.textContent = '⚠️ Completá todos los campos obligatorios.';
-        status.style.color = 'var(--danger)';
+    // Validaciones
+    if (!nombre || !apellido || !dni || !telRaw) {
+        setStatus(status, '⚠️ Completá todos los campos obligatorios.');
         return;
     }
     if (!/^\d{7,8}$/.test(dni)) {
-        status.textContent = '⚠️ El DNI debe tener 7 u 8 dígitos numéricos.';
-        status.style.color = 'var(--danger)';
+        setStatus(status, '⚠️ El DNI debe tener 7 u 8 dígitos numéricos.');
         return;
     }
-    if (!fecha || !startTime || !doctorSeleccionado) {
-        status.textContent = '⚠️ Seleccioná fecha, horario y profesional.';
-        status.style.color = 'var(--danger)';
+    if (!/^\d{10}$/.test(telRaw)) {
+        setStatus(status, '⚠️ El teléfono debe tener 10 dígitos (sin el 549).');
+        return;
+    }
+    if (!tratamiento) {
+        setStatus(status, '⚠️ Seleccioná el tratamiento.');
+        return;
+    }
+    if (!startTime || !slotSeleccionado) {
+        setStatus(status, '⚠️ Seleccioná fecha y horario.');
         return;
     }
 
@@ -336,7 +497,7 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
                     tags: ['web-agendamiento'],
                     customFields: [
                         { key: 'DNI', field_value: dni },
-                        { key: 'Tratamiento', field_value: motivo || 'Consulta' }
+                        { key: 'Tratamiento', field_value: tratamiento }
                     ]
                 })
             });
@@ -349,19 +510,18 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         const appointmentRes = await ghlFetch('calendars/events/appointments', {
             method: 'POST',
             body: JSON.stringify({
-                calendarId: doctorSeleccionado.calendar_id,
+                calendarId: slotSeleccionado.calendarId,
                 locationId: GHL_LOC,
                 contactId,
                 startTime,
-                title: `${nombre} ${apellido}${obraSocial ? ' - ' + obraSocial : ''} - ${motivo || 'Consulta'}`,
+                title: `${nombre} ${apellido}${obraSocial ? ' - ' + obraSocial : ''} - ${tratamiento}`,
                 appointmentStatus: 'confirmed'
             })
         });
         appointmentId = appointmentRes?.appointment?.id || appointmentRes?.id;
         if (!appointmentId) throw new Error('GHL no devolvió el ID del turno.');
 
-        // 3. Notificar al workflow n8n para persistir en base de datos
-        const calendarName = `${doctorSeleccionado.profesional} - ${doctorSeleccionado.sede}`;
+        // 3. Notificar al workflow n8n
         const webhookRes = await fetch('/api/webhook-agendamiento', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -372,10 +532,10 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
                 phone: telefono,
                 DNI: dni,
                 'Obra Social': obraSocial,
-                Tratamiento: motivo || 'Consulta',
+                Tratamiento: tratamiento,
                 calendar: {
                     appointmentId,
-                    calendarName,
+                    calendarName: slotSeleccionado.calendarName,
                     startTime,
                     last_updated_by_meta: { source: 'Web Agendamiento' }
                 }
@@ -383,7 +543,6 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         });
 
         if (!webhookRes.ok) {
-            // Rollback: cancelar la cita en GHL para evitar turnos fantasma sin registro en DB
             await ghlFetch(`calendars/events/appointments/${appointmentId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ appointmentStatus: 'cancelled' })
@@ -394,19 +553,25 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         document.getElementById('successModal')?.classList.add('active');
         document.getElementById('agendarForm').reset();
         document.getElementById('agendarFormContainer').style.display = 'none';
-        document.querySelectorAll('.doctor-button').forEach(b => b.classList.remove('selected'));
-        doctorSeleccionado = null;
+        document.getElementById('especialidadSelect').value = '';
+        document.getElementById('profesionalSelect').value = '';
+        disponibilidadGlobal = {};
+        slotSeleccionado = null;
     } catch (e) {
-        status.textContent = `❌ ${e.message || 'Error al agendar.'}`;
-        status.style.color = 'var(--danger)';
+        setStatus(status, `❌ ${e.message || 'Error al agendar.'}`);
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Confirmar Turno';
     }
 });
 
+function setStatus(el, msg, color) {
+    el.textContent = msg;
+    el.style.color = color || 'var(--danger)';
+}
+
 // =============================================
-// 7. BUSCAR MIS TURNOS POR DNI (Supabase)
+// 5. BUSCAR MIS TURNOS POR DNI (Supabase)
 // =============================================
 async function buscarMisTurnos() {
     const sede = document.getElementById('consultaSede').value;
@@ -414,27 +579,21 @@ async function buscarMisTurnos() {
     const container = document.getElementById('resultadoTurnos');
 
     if (!sede) { container.innerHTML = '<p style="color:var(--danger);text-align:center;">Seleccioná una sede.</p>'; return; }
-    if (!dni) { container.innerHTML = '<p style="color:var(--danger);text-align:center;">Ingresá tu DNI.</p>'; return; }
+    if (!dni)  { container.innerHTML = '<p style="color:var(--danger);text-align:center;">Ingresá tu DNI.</p>'; return; }
 
     container.innerHTML = '<p class="loading-spinner" style="text-align:center;padding:2rem;">Buscando turnos...</p>';
 
     try {
-        // Calcular hoy en zona AR
         const ahora = new Date();
         const hoyArg = new Date(ahora.toLocaleString('en-US', { timeZone: TZ }));
         hoyArg.setHours(0, 0, 0, 0);
 
-        // PASO 1: Buscar directo por DNI
         let turnosPorDni = await supaFetch(
             `/registros?select=*&dni=eq.${encodeURIComponent(dni)}&sede=eq.${sede}&order=fecha_turno.asc&limit=100`
         ).catch(() => []);
-        console.log('[Turnos] Por DNI directo:', turnosPorDni.length);
 
-        // PASO 2: Buscar teléfono en personas por DNI
         const personas = await supaFetch(`/personas?select=telefono,nombre&dni=eq.${encodeURIComponent(dni)}&limit=5`).catch(() => []);
-        console.log('[Personas] Por DNI:', personas);
 
-        // Generar variantes del teléfono
         const telefonos = new Set();
         if (personas && personas.length) {
             personas.forEach(p => {
@@ -442,87 +601,52 @@ async function buscarMisTurnos() {
                 if (!raw) return;
                 telefonos.add(raw);
                 telefonos.add('+' + raw);
-                if (raw.startsWith('549')) { 
-                    telefonos.add(raw.slice(3)); 
-                    telefonos.add(raw.slice(2)); 
-                    telefonos.add('+' + raw.slice(3)); 
-                } else if (raw.startsWith('54')) { 
-                    telefonos.add(raw.slice(2)); 
+                if (raw.startsWith('549')) {
+                    telefonos.add(raw.slice(3));
+                    telefonos.add(raw.slice(2));
+                    telefonos.add('+' + raw.slice(3));
+                } else if (raw.startsWith('54')) {
+                    telefonos.add(raw.slice(2));
                     telefonos.add('+' + raw.slice(2));
-                } else { 
-                    telefonos.add('54' + raw); 
-                    telefonos.add('549' + raw); 
-                    telefonos.add('+54' + raw); 
-                    telefonos.add('+549' + raw); 
+                } else {
+                    telefonos.add('54' + raw);
+                    telefonos.add('549' + raw);
+                    telefonos.add('+54' + raw);
+                    telefonos.add('+549' + raw);
                 }
             });
         }
 
-        // DEPURACIÓN: Traer los últimos 5 turnos de cualquier persona en esta sede para ver el formato
-        supaFetch(`/registros?select=numero,fecha_turno,sede&sede=eq.${sede}&order=fecha_turno.desc&limit=5`)
-            .then(d => console.log('[DEBUG] Últimos 5 registros en esta sede:', d))
-            .catch(() => {});
-
-        // PASO 3: Buscar registros por teléfono
         let turnosPorTel = [];
         for (const tel of telefonos) {
             const res = await supaFetch(
                 `/registros?select=*&numero=eq.${tel}&sede=eq.${sede}&order=fecha_turno.asc&limit=100`
             ).catch(() => []);
-            console.log('[Registros] tel', tel, 'sede', sede, '→', res.length, 'registros');
-            if (res && res.length) {
-                turnosPorTel = [...turnosPorTel, ...res];
-            }
+            if (res && res.length) turnosPorTel = [...turnosPorTel, ...res];
         }
 
-        // Unir ambas listas
         let turnos = [...turnosPorDni, ...turnosPorTel];
-
-        // Eliminar duplicados
         const vistos = new Set();
         turnos = turnos.filter(t => {
-            // usar el id principal o event_id o toda la fila serializada como key
             const key = t.id ? t.id.toString() : (t.event_id || JSON.stringify(t));
             if (vistos.has(key)) return false;
             vistos.add(key);
             return true;
         });
 
-        // Filtrar fechas futuras en el cliente
-        console.log('[Debug] Turnos antes del filtro:', turnos);
         turnos = turnos.filter(t => {
             const raw = t.fecha_turno || t.fecha || '';
-            if (!raw) {
-                console.log('[Filtro] Sin fecha:', t);
-                return false;
-            }
-            
-            // Intentar parsear diferentes formatos
+            if (!raw) return false;
             let d;
             if (raw.includes('/')) {
-                // Posible formato DD/MM/YYYY
                 const parts = raw.split(/[/\s:-]/);
-                if (parts.length >= 3) {
-                    // Asumimos DD/MM/YYYY
-                    d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`);
-                } else {
-                    d = new Date(raw);
-                }
+                d = parts.length >= 3 ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`) : new Date(raw);
             } else {
                 d = new Date(raw.includes('T') ? raw : raw + 'T00:00:00');
             }
-            
-            console.log('[Filtro] Comparando:', { raw, parseada: d, hoy: hoyArg, futuro: d >= hoyArg });
-            
-            // Si la fecha es inválida, la mostramos por las dudas
-            if (isNaN(d.getTime())) {
-                console.warn('[Filtro] Fecha inválida:', raw);
-                return true; 
-            }
-            
+            if (isNaN(d.getTime())) return true;
             return d >= hoyArg;
         });
-        console.log('[Debug] Turnos después del filtro:', turnos);
 
         if (!turnos.length) {
             container.innerHTML = '<div class="no-results">No hay turnos próximos para este DNI en la sede seleccionada.</div>';
@@ -534,7 +658,7 @@ async function buscarMisTurnos() {
             const start = new Date(raw.includes('T') ? raw : raw + 'T00:00:00');
             const fechaStr = start.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: TZ });
             const horaStr = raw.includes('T') ? start.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ }) : (t.hora || '');
-            const eventId = t.event_id || t.eventId || '';
+            const eventId = t.event_id || t.eventId || t.id || '';
             const rawStatus = (t.estado || t.status || 'agendado').toLowerCase();
             const isCancelled = rawStatus === 'cancelado' || rawStatus === 'cancelled';
 
@@ -547,6 +671,8 @@ async function buscarMisTurnos() {
                 pendiente: { label: 'Pendiente', cls: 'status-pending' }
             };
             const st = statusMap[rawStatus] || { label: rawStatus, cls: 'status-pending' };
+            const sedeEscapada = (t.sede || '').replace(/'/g, '');
+            const profEscapado = (t.profesional || '').replace(/'/g, '');
 
             return `
                 <div class="turno-card">
@@ -563,19 +689,18 @@ async function buscarMisTurnos() {
                     </div>
                     ${!isCancelled && eventId ? `
                     <div class="turno-actions">
-                        <button class="btn-reagendar" onclick="abrirReagendamiento('${eventId}', '${(t.profesional || '').replace(/'/g, '')}')">Reagendar</button>
+                        <button class="btn-reagendar" onclick="abrirReagendamiento('${eventId}', '${profEscapado}', '${sedeEscapada}')">Reagendar</button>
                         <button class="btn-cancelar" onclick="cancelarTurno('${eventId}')">Cancelar</button>
                     </div>` : ''}
                 </div>`;
         }).join('');
     } catch (e) {
-        console.error('[buscarMisTurnos] Error:', e);
         container.innerHTML = `<div class="no-results" style="color:var(--danger);">Error: ${e.message}</div>`;
     }
 }
 
 // =============================================
-// 8. CANCELAR TURNO (GHL API)
+// 6. CANCELAR TURNO
 // =============================================
 async function cancelarTurno(appointmentId) {
     if (!confirm('¿Estás seguro de que querés cancelar este turno?')) return;
@@ -592,26 +717,33 @@ async function cancelarTurno(appointmentId) {
 }
 
 // =============================================
-// 9. REAGENDAR TURNO
+// 7. REAGENDAR TURNO
 // =============================================
-async function abrirReagendamiento(appointmentId, profesionalName) {
+async function abrirReagendamiento(appointmentId, profesionalName, sede) {
     document.getElementById('rescheduleAppointmentId').value = appointmentId;
     document.getElementById('rescheduleDate').value = '';
     document.getElementById('rescheduleTime').value = '';
-    document.getElementById('rescheduleTimeSlotsContainer').innerHTML = '<p class="placeholder-text">Selecciona una fecha.</p>';
+    document.getElementById('rescheduleTimeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha.</p>';
     document.getElementById('rescheduleStatus').textContent = '';
     document.getElementById('rescheduleModal').classList.add('active');
 
-    // Buscar el calendarId del profesional en Supabase
     const container = document.getElementById('rescheduleDatePicker');
     container.innerHTML = '<p class="placeholder-text" style="margin:auto;">Cargando agenda...</p>';
 
     try {
         let calendarId = '';
+
         if (profesionalName) {
-            const profs = await supaFetch(`/profesionales?select=calendar_id&profesional=ilike.*${encodeURIComponent(profesionalName.split(' - ')[0].trim())}*&limit=1`);
+            const nombreBase = profesionalName.split(' - ')[0].trim();
+            const profs = await supaFetch(`/profesionales?select=calendar_id&profesional=ilike.*${encodeURIComponent(nombreBase)}*&limit=1`).catch(() => []);
             if (profs.length) calendarId = profs[0].calendar_id;
         }
+
+        if (!calendarId && sede) {
+            const profsBySede = await supaFetch(`/profesionales?select=calendar_id&sede=ilike.*${encodeURIComponent(sede)}*&limit=1`).catch(() => []);
+            if (profsBySede.length) calendarId = profsBySede[0].calendar_id;
+        }
+
         document.getElementById('rescheduleCalendarId').value = calendarId;
 
         if (!calendarId) {
@@ -623,22 +755,23 @@ async function abrirReagendamiento(appointmentId, profesionalName) {
         const end = now + 60 * 24 * 60 * 60 * 1000;
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const data = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
+        const slotsMap = data?.slots || data?.data || data || {};
 
         container.innerHTML = '';
         const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        const fechas = Object.keys(data).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+        const fechas = Object.keys(slotsMap).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
         let hayDias = false;
 
         fechas.forEach(dateStr => {
-            const slots = data[dateStr]?.slots || data[dateStr];
+            const slots = slotsMap[dateStr]?.slots || slotsMap[dateStr];
             if (!Array.isArray(slots) || !slots.length) return;
             hayDias = true;
             const [y, m, d] = dateStr.split('-');
             const dateObj = new Date(y, m - 1, d);
             const card = document.createElement('div');
             card.className = 'date-card has-slots';
-            card.onclick = () => seleccionarFechaReagendar(dateStr, card, data);
+            card.onclick = () => seleccionarFechaReagendar(dateStr, card, slotsMap);
             card.innerHTML = `<span class="day-name">${days[dateObj.getDay()]}</span><span class="day-number">${d}</span><span class="month-year">${months[dateObj.getMonth()]}</span>`;
             container.appendChild(card);
         });
@@ -658,7 +791,10 @@ function seleccionarFechaReagendar(dateStr, cardEl, avail) {
     const slotsData = avail[dateStr]?.slots || avail[dateStr];
     const container = document.getElementById('rescheduleTimeSlotsContainer');
     container.innerHTML = '';
-    if (!Array.isArray(slotsData) || !slotsData.length) { container.innerHTML = '<p class="placeholder-text">No hay horarios.</p>'; return; }
+    if (!Array.isArray(slotsData) || !slotsData.length) {
+        container.innerHTML = '<p class="placeholder-text">No hay horarios.</p>';
+        return;
+    }
 
     const parsed = [];
     slotsData.forEach(slot => {
@@ -707,23 +843,117 @@ async function confirmarReagendamiento() {
 }
 
 // =============================================
-// INPUT FILTERS
+// LOOKUP PACIENTE POR DNI
 // =============================================
-document.getElementById('dni')?.addEventListener('input', e => e.target.value = e.target.value.replace(/\D/g, ''));
-document.getElementById('consultaDNI')?.addEventListener('input', e => e.target.value = e.target.value.replace(/\D/g, ''));
-document.getElementById('telefono')?.addEventListener('input', e => {
-    let val = e.target.value.replace(/\D/g, '');
-    if (val.length > 0 && !val.startsWith('549')) {
-        if (val.startsWith('54')) val = '549' + val.substring(2);
-        else if (val.startsWith('5')) val = '549' + val.substring(1);
-        else val = '549' + val;
+async function buscarPacientePorDni(dni) {
+    const statusEl = document.getElementById('dniLookupStatus');
+    if (!/^\d{7,8}$/.test(dni)) { statusEl.textContent = ''; return; }
+
+    statusEl.textContent = 'Buscando...';
+    try {
+        const data = await supaFetch(`/personas?select=nombre,telefono,obra_social&dni=eq.${encodeURIComponent(dni)}&limit=1`);
+        if (!data.length) { statusEl.textContent = ''; return; }
+
+        const p = data[0];
+        const fullName = (p.nombre || '').trim();
+        const parts = fullName.split(' ');
+        if (parts.length >= 2) {
+            document.getElementById('nombre').value = parts.slice(0, -1).join(' ');
+            document.getElementById('apellido').value = parts[parts.length - 1];
+        } else {
+            document.getElementById('nombre').value = fullName;
+        }
+
+        if (p.telefono) {
+            let tel = String(p.telefono).replace(/\D/g, '');
+            if (tel.startsWith('549')) tel = tel.slice(3);
+            else if (tel.startsWith('54')) tel = tel.slice(2);
+            document.getElementById('telefono').value = tel.slice(0, 10);
+        }
+
+        if (p.obra_social) {
+            const sel = document.getElementById('obraSocial');
+            const match = [...sel.options].find(o => o.value.toLowerCase() === p.obra_social.toLowerCase());
+            if (match) sel.value = match.value;
+            else { sel.value = 'Otra'; }
+        }
+
+        statusEl.textContent = '✓ Datos encontrados';
+        statusEl.style.color = 'var(--success)';
+        setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    } catch (_) {
+        statusEl.textContent = '';
     }
-    e.target.value = val;
-});
-document.getElementById('telefono')?.addEventListener('focus', e => { if (!e.target.value) e.target.value = '549'; });
-document.getElementById('consultaDNI')?.addEventListener('keypress', e => { if (e.key === 'Enter') buscarMisTurnos(); });
+}
+
+// =============================================
+// INPUT FILTERS — robusto
+// =============================================
+
+// DNI: solo dígitos, máximo 8
+function enforceDni(input) {
+    let val = input.value.replace(/\D/g, '');
+    if (val.length > 8) val = val.slice(0, 8);
+    if (input.value !== val) input.value = val;
+}
+
+// Teléfono: solo dígitos, máximo 10
+function enforceTelefono(input) {
+    let val = input.value.replace(/\D/g, '');
+    if (val.length > 10) val = val.slice(0, 10);
+    if (input.value !== val) input.value = val;
+}
+
+// DNI principal
+const dniInput = document.getElementById('dni');
+if (dniInput) {
+    dniInput.addEventListener('input', () => enforceDni(dniInput));
+    dniInput.addEventListener('keydown', e => {
+        const allowed = ['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'];
+        if (!allowed.includes(e.key) && !/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+        }
+    });
+    dniInput.addEventListener('blur', () => buscarPacientePorDni(dniInput.value.trim()));
+}
+
+// DNI consulta turnos
+const consultaDNI = document.getElementById('consultaDNI');
+if (consultaDNI) {
+    consultaDNI.addEventListener('input', () => enforceDni(consultaDNI));
+    consultaDNI.addEventListener('keydown', e => {
+        const allowed = ['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'];
+        if (!allowed.includes(e.key) && !/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+        }
+    });
+    consultaDNI.addEventListener('keypress', e => { if (e.key === 'Enter') buscarMisTurnos(); });
+}
+
+// Teléfono
+const telInput = document.getElementById('telefono');
+if (telInput) {
+    telInput.addEventListener('input', () => enforceTelefono(telInput));
+    telInput.addEventListener('keydown', e => {
+        const allowed = ['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'];
+        if (!allowed.includes(e.key) && !/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+        }
+    });
+    telInput.addEventListener('paste', e => {
+        e.preventDefault();
+        const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+        // si pegaron con el prefijo, quitarlo
+        let clean = pasted;
+        if (clean.startsWith('549')) clean = clean.slice(3);
+        else if (clean.startsWith('54')) clean = clean.slice(2);
+        telInput.value = clean.slice(0, 10);
+    });
+}
 
 // =============================================
 // INIT
 // =============================================
-initConfig().then(() => cargarEspecialidades());
+initConfig().then(() => {
+    cargarEspecialidades();
+});
