@@ -1,7 +1,6 @@
 const ALLOWED_PATHS = [
     { pattern: /^contacts\/search\/duplicate$/, methods: ['GET'] },
     { pattern: /^contacts\/?$/, methods: ['POST'] },
-    { pattern: /^contacts\/[^/]+$/, methods: ['GET', 'PUT', 'PATCH'] },
     { pattern: /^calendars\/events\/appointments\/?$/, methods: ['GET', 'POST'] },
     { pattern: /^calendars\/events\/appointments\/[^/]+$/, methods: ['GET', 'PUT', 'PATCH'] },
     { pattern: /^calendars\/[^/]+\/free-slots$/, methods: ['GET'] },
