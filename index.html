@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MGV Dental - Autogestión de Turnos</title>
+    <link rel="icon" href="clinica-dental1.png" type="image/png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header-brand">
+            <img src="clinica-dental1.png" alt="MGV Dental" class="brand-logo" onerror="this.style.display='none'">
+            <h1>MGV Dental</h1>
+            <p class="subtitle">Agenda tu cita en simples pasos</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs-container">
+            <div class="nav-buttons-container">
+                <button class="nav-button active" data-tab="agendar" onclick="selectTab('agendar')">Agendar Turno</button>
+                <button class="nav-button" data-tab="misturnos" onclick="selectTab('misturnos')">Mis Turnos</button>
+            </div>
+        </div>
+
+        <!-- Tab: Agendar -->
+        <div id="tab-agendar" class="tab-content active">
+            <h2 class="section-title">1. Selecciona la especialidad</h2>
+            <select id="especialidadSelect" class="form-select" onchange="cargarProfesionales()">
+                <option value="">Cargando especialidades...</option>
+            </select>
+
+            <div id="profesionalesContainer" class="doctors-grid" style="display:none;"></div>
+
+            <!-- Formulario de agendamiento -->
+            <div id="agendarFormContainer" style="display:none;">
+                <h2 class="section-title">2. Completa tus datos</h2>
+                <p id="agendarDoctorInfo" class="doctor-info-badge"></p>
+
+                <form id="agendarForm" class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Nombre <span class="required">*</span></label>
+                        <input type="text" id="nombre" class="form-input" required placeholder="Tu nombre">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Apellido <span class="required">*</span></label>
+                        <input type="text" id="apellido" class="form-input" required placeholder="Tu apellido">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">DNI <span class="required">*</span></label>
+                        <input type="text" id="dni" class="form-input" required placeholder="Solo números" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Teléfono <span class="required">*</span></label>
+                        <input type="tel" id="telefono" class="form-input" required placeholder="Ej: 5491123456789">
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Motivo de consulta</label>
+                        <input type="text" id="motivo" class="form-input" placeholder="Opcional">
+                    </div>
+
+                    <h2 class="section-title full-width">3. Elige el horario</h2>
+
+                    <div class="form-group full-width">
+                        <label class="form-label">Días Disponibles <span class="required">*</span></label>
+                        <div class="date-picker-wrapper">
+                            <button type="button" class="scroll-btn" onclick="scrollDates('left')">◀</button>
+                            <div id="datePickerContainer" class="date-picker-container">
+                                <p class="placeholder-text">Cargando agenda del profesional...</p>
+                            </div>
+                            <button type="button" class="scroll-btn" onclick="scrollDates('right')">▶</button>
+                        </div>
+                        <input type="hidden" id="appointmentDate" required>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label">Horarios Disponibles <span class="required">*</span></label>
+                        <div id="timeSlotsContainer" class="time-slots-grid">
+                            <p class="placeholder-text">Selecciona una fecha para ver horarios.</p>
+                        </div>
+                        <input type="hidden" id="appointmentTime" required>
+                    </div>
+
+                    <div class="form-group full-width" style="margin-top:1.5rem;">
+                        <button type="submit" class="save-button" id="submitBtn">Confirmar Turno</button>
+                        <div id="agendarStatus" class="status-msg"></div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tab: Mis Turnos -->
+        <div id="tab-misturnos" class="tab-content">
+            <h2 class="section-title">Consultar mis turnos</h2>
+            <p class="subtitle-sm">Seleccioná tu sede e ingresá tu DNI para ver, reagendar o cancelar tus turnos.</p>
+            <div class="form-group" style="margin-bottom:1rem;">
+                <label class="form-label">Sede <span class="required">*</span></label>
+                <select id="consultaSede" class="form-select">
+                    <option value="">Selecciona una sede</option>
+                    <option value="Lanus">Lanús</option>
+                    <option value="Lomas">Lomas</option>
+                </select>
+            </div>
+            <div class="search-row">
+                <input type="text" id="consultaDNI" class="form-input" placeholder="Tu DNI (solo números)" maxlength="10">
+                <button class="save-button" style="width:auto;padding:0.75rem 2rem;" onclick="buscarMisTurnos()">Buscar</button>
+            </div>
+            <div id="resultadoTurnos"></div>
+        </div>
+    </div>
+
+    <!-- Modal Éxito -->
+    <div id="successModal" class="modal-overlay">
+        <div class="modal-content" style="text-align:center;max-width:400px;">
+            <div class="success-icon">✓</div>
+            <h3>¡Turno Agendado con éxito!</h3>
+            <p class="subtitle-sm">Te enviaremos los detalles a tu WhatsApp.</p>
+            <button class="save-button" onclick="cerrarModal('successModal')">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Modal Reagendar -->
+    <div id="rescheduleModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="close-modal" onclick="cerrarModal('rescheduleModal')">&times;</button>
+            <h3>Reagendar Turno</h3>
+            <input type="hidden" id="rescheduleAppointmentId">
+            <input type="hidden" id="rescheduleCalendarId">
+            <div class="form-group" style="margin-top:1rem;">
+                <label class="form-label">Nueva Fecha</label>
+                <div class="date-picker-wrapper">
+                    <button type="button" class="scroll-btn" onclick="scrollRescheduleDates('left')">◀</button>
+                    <div id="rescheduleDatePicker" class="date-picker-container"></div>
+                    <button type="button" class="scroll-btn" onclick="scrollRescheduleDates('right')">▶</button>
+                </div>
+                <input type="hidden" id="rescheduleDate">
+            </div>
+            <div class="form-group" style="margin-top:1rem;">
+                <label class="form-label">Nuevo Horario</label>
+                <div id="rescheduleTimeSlotsContainer" class="time-slots-grid">
+                    <p class="placeholder-text">Selecciona una fecha.</p>
+                </div>
+                <input type="hidden" id="rescheduleTime">
+            </div>
+            <button class="save-button" style="margin-top:1.5rem;" onclick="confirmarReagendamiento()">Confirmar Reagendamiento</button>
+            <div id="rescheduleStatus" class="status-msg"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
