@@ -1,14 +1,23 @@
 // =============================================
 // CONFIGURACIÓN
 // =============================================
-const SUPABASE_URL = 'https://devsupabase-dentalquality.surovianiasystems.site/rest/v1';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzE1MDUwODAwLAogICJleHAiOiAxODcyODE3MjAwCn0.FM9zFJ9Y0FsLT9pgW--ZnupLFMZ-CcRWOu6Q7IJv9d0';
-const SUPABASE_HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' };
-
-// Proxy local que evita CORS con GHL (correr: npm install && node proxy.js)
-const GHL_PROXY = 'http://localhost:3001/ghl';
+let SUPABASE_URL = '';
+let SUPABASE_HEADERS = {};
 const GHL_LOC = 'fotG33HIQ58UyWeEbpx9';
 const TZ = 'America/Argentina/Buenos_Aires';
+
+async function initConfig() {
+    try {
+        const res = await fetch('/api/config');
+        if (!res.ok) throw new Error('config endpoint failed');
+        const cfg = await res.json();
+        SUPABASE_URL = cfg.SUPABASE_URL || '';
+        const key = cfg.SUPABASE_ANON_KEY || '';
+        SUPABASE_HEADERS = { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' };
+    } catch (_) {
+        console.warn('[Config] No se pudo cargar configuración del servidor');
+    }
+}
 
 
 // =============================================
@@ -282,6 +291,7 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
     const dni = document.getElementById('dni').value.trim();
     const telefono = document.getElementById('telefono').value.trim();
     const motivo = document.getElementById('motivo').value.trim();
+    const obraSocial = (document.getElementById('obraSocial')?.value || '').trim();
     const fecha = document.getElementById('appointmentDate').value;
     const startTime = document.getElementById('appointmentTime').value;
 
@@ -290,8 +300,8 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         status.style.color = 'var(--danger)';
         return;
     }
-    if (!/^\d+$/.test(dni)) {
-        status.textContent = '⚠️ El DNI solo debe contener números.';
+    if (!/^\d{7,8}$/.test(dni)) {
+        status.textContent = '⚠️ El DNI debe tener 7 u 8 dígitos numéricos.';
         status.style.color = 'var(--danger)';
         return;
     }
@@ -304,6 +314,8 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
     submitBtn.disabled = true;
     submitBtn.textContent = 'Procesando...';
     status.textContent = '';
+
+    let appointmentId = null;
 
     try {
         // 1. Buscar o crear contacto en GHL
@@ -334,19 +346,51 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         if (!contactId) throw new Error('No se pudo crear el contacto.');
 
         // 2. Crear cita en GHL
-        await ghlFetch('calendars/events/appointments', {
+        const appointmentRes = await ghlFetch('calendars/events/appointments', {
             method: 'POST',
             body: JSON.stringify({
                 calendarId: doctorSeleccionado.calendar_id,
                 locationId: GHL_LOC,
                 contactId,
                 startTime,
-                title: `${nombre} ${apellido} - ${motivo || 'Consulta'}`,
+                title: `${nombre} ${apellido}${obraSocial ? ' - ' + obraSocial : ''} - ${motivo || 'Consulta'}`,
                 appointmentStatus: 'confirmed'
             })
         });
+        appointmentId = appointmentRes?.appointment?.id || appointmentRes?.id;
+        if (!appointmentId) throw new Error('GHL no devolvió el ID del turno.');
 
-        // GHL dispara el webhook a n8n automáticamente
+        // 3. Notificar al workflow n8n para persistir en base de datos
+        const calendarName = `${doctorSeleccionado.profesional} - ${doctorSeleccionado.sede}`;
+        const webhookRes = await fetch('/api/webhook-agendamiento', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                first_name: nombre,
+                last_name: apellido,
+                full_name: `${nombre} ${apellido}`,
+                phone: telefono,
+                DNI: dni,
+                'Obra Social': obraSocial,
+                Tratamiento: motivo || 'Consulta',
+                calendar: {
+                    appointmentId,
+                    calendarName,
+                    startTime,
+                    last_updated_by_meta: { source: 'Web Agendamiento' }
+                }
+            })
+        });
+
+        if (!webhookRes.ok) {
+            // Rollback: cancelar la cita en GHL para evitar turnos fantasma sin registro en DB
+            await ghlFetch(`calendars/events/appointments/${appointmentId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ appointmentStatus: 'cancelled' })
+            }).catch(() => {});
+            throw new Error('No se pudo registrar el turno. Por favor reintentá en unos minutos.');
+        }
+
         document.getElementById('successModal')?.classList.add('active');
         document.getElementById('agendarForm').reset();
         document.getElementById('agendarFormContainer').style.display = 'none';
@@ -682,4 +726,4 @@ document.getElementById('consultaDNI')?.addEventListener('keypress', e => { if (
 // =============================================
 // INIT
 // =============================================
-cargarEspecialidades();
+initConfig().then(() => cargarEspecialidades());

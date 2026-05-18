@@ -1,12 +1,20 @@
+// Proxy local solo para desarrollo. En producción se usa api/ghl.js (Vercel serverless).
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
+
+const GHL_KEY = process.env.GHL_API_KEY;
+if (!GHL_KEY) {
+    console.error('ERROR: GHL_API_KEY no está en .env');
+    process.exit(1);
+}
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const GHL_KEY = 'pit-185339e4-2055-47a3-8b49-7e5850c447e6';
 const GHL_BASE = 'https://services.leadconnectorhq.com';
 const GHL_HEADERS = {
     'Authorization': `Bearer ${GHL_KEY}`,
@@ -14,17 +22,13 @@ const GHL_HEADERS = {
     'Content-Type': 'application/json'
 };
 
-// Proxy generico para GHL
 app.all('/ghl/*', async (req, res) => {
     const path = req.params[0];
     const query = new URLSearchParams(req.query).toString();
     const url = `${GHL_BASE}/${path}${query ? '?' + query : ''}`;
 
     try {
-        const opts = {
-            method: req.method,
-            headers: GHL_HEADERS
-        };
+        const opts = { method: req.method, headers: GHL_HEADERS };
         if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
             opts.body = JSON.stringify(req.body);
         }
@@ -36,8 +40,7 @@ app.all('/ghl/*', async (req, res) => {
     }
 });
 
-// Health check
 app.get('/health', (_, res) => res.json({ ok: true }));
 
-const PORT = 3001;
+const PORT = process.env.PROXY_PORT || 3001;
 app.listen(PORT, () => console.log(`Proxy GHL corriendo en http://localhost:${PORT}`));

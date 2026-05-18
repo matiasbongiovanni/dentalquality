@@ -1,15 +1,22 @@
 const fetch = require('node-fetch');
+const { isAllowed } = require('./_lib/ghlAllowlist');
+
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar';
 
 module.exports = async (req, res) => {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, Version');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST,PUT,PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
 
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
+    }
+
+    const GHL_API_KEY = process.env.GHL_API_KEY;
+    if (!GHL_API_KEY) {
+        return res.status(500).json({ error: 'GHL_API_KEY no configurada' });
     }
 
     const { path } = req.query;
@@ -17,35 +24,29 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: 'Missing path parameter' });
     }
 
-    const GHL_BASE = 'https://services.leadconnectorhq.com';
-    // Reconstruir la URL de GHL (path viene como string o array)
     const targetPath = Array.isArray(path) ? path.join('/') : path;
-    
-    // Obtener los query params originales y sacar el "path"
+
+    if (!isAllowed(targetPath, req.method)) {
+        return res.status(403).json({ error: 'Path no permitido' });
+    }
+
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(req.query)) {
-        if (key !== 'path') {
-            queryParams.append(key, value);
-        }
+        if (key !== 'path') queryParams.append(key, value);
     }
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
-
-    const ghlUrl = `${GHL_BASE}/${targetPath}${queryString}`;
-    
-    // Configurar API Key de GHL
-    const GHL_LOCATION_ID = 'fotG33HIQ58UyWeEbpx9';
-    const GHL_API_KEY = 'Bearer pit-70d37e69-00ab-4416-ab7e-6617dd2ef9fe'; // En prod idealmente usar variables de entorno
+    const ghlUrl = `https://services.leadconnectorhq.com/${targetPath}${queryString}`;
 
     const fetchOptions = {
         method: req.method,
         headers: {
-            'Authorization': GHL_API_KEY,
+            'Authorization': `Bearer ${GHL_API_KEY}`,
             'Version': '2021-07-28',
             'Accept': 'application/json'
         }
     };
 
-    if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
+    if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
         fetchOptions.headers['Content-Type'] = 'application/json';
         fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     }
@@ -55,7 +56,6 @@ module.exports = async (req, res) => {
         const data = await ghlRes.json();
         res.status(ghlRes.status).json(data);
     } catch (error) {
-        console.error('[Vercel API] Error calling GHL:', error);
-        res.status(500).json({ error: 'Failed to fetch from GHL API', details: error.message });
+        res.status(500).json({ error: 'Error al conectar con GHL' });
     }
 };
