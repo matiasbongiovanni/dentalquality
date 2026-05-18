@@ -28,49 +28,91 @@ let bookingMode = 'especialidad'; // 'especialidad' | 'profesional'
 let profesionalesCache = []; // cache de profesionales de Supabase
 
 // =============================================
-// TRATAMIENTOS POR ESPECIALIDAD
+// ESPECIALIDADES (hardcoded)
 // =============================================
-const TRATAMIENTOS = {
-    'odontología general':  ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración'],
-    'odontologia general':  ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración'],
-    'general':              ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración'],
-    'ortodoncia':           ['Consulta inicial de ortodoncia', 'Colocación de brackets', 'Control de brackets', 'Ortodoncia invisible (Invisalign)', 'Retención post-tratamiento'],
-    'implantología':        ['Consulta de implantes', 'Colocación de implante', 'Control post-operatorio', 'Corona sobre implante'],
-    'implantologia':        ['Consulta de implantes', 'Colocación de implante', 'Control post-operatorio', 'Corona sobre implante'],
-    'endodoncia':           ['Tratamiento de conductos', 'Retratamiento de conductos', 'Urgencia endodóntica'],
-    'periodoncia':          ['Raspaje y alisado radicular', 'Tratamiento de encías', 'Cirugía periodontal', 'Control periodontal'],
-    'estética dental':      ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa'],
-    'estetica dental':      ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa'],
-    'estética':             ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa'],
-    'estetica':             ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa'],
-    'cirugía':              ['Extracción de muela del juicio', 'Cirugía de tejidos blandos', 'Frenectomía'],
-    'cirugia':              ['Extracción de muela del juicio', 'Cirugía de tejidos blandos', 'Frenectomía'],
-    'odontopediatría':      ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil', 'Aparatología removible'],
-    'odontopediatria':      ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil', 'Aparatología removible'],
-    'pediátrico':           ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil'],
-    'pediatrico':           ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil'],
-    'prótesis':             ['Consulta de prótesis', 'Prótesis fija', 'Prótesis removible', 'Prótesis total', 'Control de prótesis'],
-    'protesis':             ['Consulta de prótesis', 'Prótesis fija', 'Prótesis removible', 'Prótesis total', 'Control de prótesis'],
-    'radiología':           ['Radiografía periapical', 'Panorámica dental', 'Tomografía CBCT'],
-    'radiologia':           ['Radiografía periapical', 'Panorámica dental', 'Tomografía CBCT'],
-};
-const TRATAMIENTOS_FALLBACK = ['Consulta general', 'Control / Revisación', 'Urgencia', 'Otro'];
+const ESPECIALIDADES = [
+    {
+        id: 'odontologia-general',
+        label: 'Odontología General',
+        icon: '🦷',
+        desc: 'Consultas, limpiezas y caries',
+        searchKey: 'odontolog',
+        tratamientos: ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración']
+    },
+    {
+        id: 'estetica-dental',
+        label: 'Estética Dental',
+        icon: '✨',
+        desc: 'Blanqueamiento, carillas y diseño de sonrisa',
+        searchKey: 'estet',
+        tratamientos: ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa', 'Consulta estética']
+    },
+    {
+        id: 'ortodoncia-alineadores',
+        label: 'Ortodoncia y Alineadores',
+        icon: '😁',
+        desc: 'Brackets, Invisalign y corrección dental',
+        searchKey: 'ortodon',
+        tratamientos: ['Consulta inicial de ortodoncia', 'Colocación de brackets', 'Control de ortodoncia', 'Alineadores (Invisalign)', 'Retención post-tratamiento']
+    },
+    {
+        id: 'implantes-protesis',
+        label: 'Implantes y Prótesis',
+        icon: '🔩',
+        desc: 'Implantes, coronas y prótesis dentales',
+        searchKey: 'implant',
+        tratamientos: ['Consulta de implantes', 'Colocación de implante', 'Control post-operatorio', 'Corona sobre implante', 'Consulta de prótesis', 'Prótesis fija', 'Prótesis removible', 'Prótesis total']
+    },
+    {
+        id: 'atm-bruxismo',
+        label: 'ATM · Bruxismo',
+        icon: '😮',
+        desc: 'Dolor mandibular y apretamiento dental',
+        searchKey: 'atm',
+        tratamientos: ['Consulta ATM', 'Diagnóstico de bruxismo', 'Placa miorelajante', 'Control de placa', 'Tratamiento de ATM']
+    },
+    {
+        id: 'odontopediatria',
+        label: 'Odontopediatría y Ortopediatría',
+        icon: '👶',
+        desc: 'Atención dental y ortopédica para niños',
+        searchKey: 'pediatr',
+        tratamientos: ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil', 'Aparatología removible', 'Ortopedia maxilar']
+    },
+];
 
-function getTratamientosPorEspecialidad(esp) {
-    if (!esp) return TRATAMIENTOS_FALLBACK;
-    const lower = esp.toLowerCase().trim();
-    if (TRATAMIENTOS[lower]) return TRATAMIENTOS[lower];
-    // buscar si la especialidad contiene alguna clave o viceversa
-    for (const key of Object.keys(TRATAMIENTOS)) {
-        if (lower.includes(key) || key.includes(lower)) return TRATAMIENTOS[key];
-    }
-    return TRATAMIENTOS_FALLBACK;
+let especialidadSeleccionada = null;
+
+function renderEspecialidadCards() {
+    const container = document.getElementById('espGridContainer');
+    if (!container) return;
+    const grid = document.createElement('div');
+    grid.className = 'esp-grid';
+    ESPECIALIDADES.forEach(esp => {
+        const card = document.createElement('div');
+        card.className = 'esp-card';
+        card.dataset.id = esp.id;
+        card.innerHTML = `
+            <div class="esp-card-icon">${esp.icon}</div>
+            <div class="esp-card-name">${esp.label}</div>
+            <div class="esp-card-desc">${esp.desc}</div>
+        `;
+        card.onclick = () => {
+            document.querySelectorAll('.esp-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            especialidadSeleccionada = esp;
+            actualizarTratamientos(esp.tratamientos);
+            cargarSlotsEspecialidad(esp.searchKey);
+        };
+        grid.appendChild(card);
+    });
+    container.innerHTML = '';
+    container.appendChild(grid);
 }
 
-function actualizarTratamientos(especialidad) {
+function actualizarTratamientos(lista) {
     const sel = document.getElementById('tratamiento');
     if (!sel) return;
-    const lista = getTratamientosPorEspecialidad(especialidad);
     sel.innerHTML = '<option value="">Seleccioná el tratamiento</option>';
     lista.forEach(t => {
         const opt = document.createElement('option');
@@ -78,6 +120,13 @@ function actualizarTratamientos(especialidad) {
         opt.textContent = t;
         sel.appendChild(opt);
     });
+}
+
+function actualizarTratamientosPorNombre(nombre) {
+    const esp = ESPECIALIDADES.find(e =>
+        nombre.toLowerCase().includes(e.searchKey) || e.searchKey.includes(nombre.toLowerCase().slice(0, 5))
+    );
+    actualizarTratamientos(esp ? esp.tratamientos : ['Consulta general', 'Control / Revisación', 'Urgencia']);
 }
 
 // =============================================
@@ -166,33 +215,9 @@ async function ghlFetch(path, opts = {}) {
 }
 
 // =============================================
-// 1A. CARGAR ESPECIALIDADES (desde Supabase)
+// 1A. RENDER ESPECIALIDADES (hardcoded)
 // =============================================
-async function cargarEspecialidades() {
-    const select = document.getElementById('especialidadSelect');
-    try {
-        const data = await supaFetch('/profesionales?select=especialidades');
-        const espSet = new Set();
-        data.forEach(row => {
-            (row.especialidades || '').split(',').forEach(s => {
-                const clean = s.replace(/^-\s*/, '').trim().toLowerCase();
-                if (clean && clean.length > 2) espSet.add(clean);
-            });
-        });
-        const sorted = [...espSet].sort();
-        select.innerHTML = '<option value="">Seleccioná una especialidad</option>';
-        sorted.forEach(e => {
-            const label = e.charAt(0).toUpperCase() + e.slice(1);
-            const opt = document.createElement('option');
-            opt.value = e;
-            opt.textContent = label;
-            select.appendChild(opt);
-        });
-    } catch (e) {
-        console.error(e);
-        select.innerHTML = '<option value="">Error al cargar especialidades</option>';
-    }
-}
+// Las especialidades son fijas — no se cargan desde Supabase
 
 // =============================================
 // 1B. CARGAR PROFESIONALES (desde Supabase)
@@ -230,7 +255,9 @@ function poblarSelectProfesionales() {
         const card = document.createElement('div');
         card.className = 'prof-card';
         card.dataset.calendarId = prof.calendar_id;
+        const inicial = (prof.profesional || '?').replace(/^(Dr|Dra)\.?\s*/i, '').trim()[0] || '?';
         card.innerHTML = `
+            <div class="prof-card-avatar">${inicial.toUpperCase()}</div>
             <div class="prof-card-name">${prof.profesional}</div>
             ${prof.sede ? `<span class="prof-card-badge">Sede: ${prof.sede}</span>` : ''}
         `;
@@ -250,9 +277,7 @@ function poblarSelectProfesionales() {
 // HANDLERS DE SELECCIÓN
 // =============================================
 function onEspecialidadChange() {
-    const especialidad = document.getElementById('especialidadSelect').value;
-    actualizarTratamientos(especialidad);
-    cargarSlotsEspecialidad(especialidad);
+    // Kept for compatibility; actual selection via card click
 }
 
 function onProfesionalChange() {
@@ -263,8 +288,8 @@ function onProfesionalChange() {
 }
 
 function onProfesionalCardSelected(prof) {
-    const primeraEsp = (prof.especialidades || '').split(',')[0].replace(/^-\s*/, '').trim().toLowerCase();
-    actualizarTratamientos(primeraEsp || '');
+    const primeraEsp = (prof.especialidades || '').split(',')[0].replace(/^-\s*/, '').trim();
+    actualizarTratamientosPorNombre(primeraEsp);
     cargarSlotsCalendar(prof.calendar_id);
 }
 
@@ -976,5 +1001,5 @@ if (telInput) {
 // INIT
 // =============================================
 initConfig().then(() => {
-    cargarEspecialidades();
+    renderEspecialidadCards();
 });
