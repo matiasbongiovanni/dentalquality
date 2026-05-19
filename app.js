@@ -794,19 +794,13 @@ async function buscarMisTurnos() {
             return;
         }
 
-        // Resolución bulk de calendar_id por profesional+sede
-        const profesionales = [...new Set(turnos.map(t => (t.profesional || '').trim()).filter(Boolean))];
-        const calendarMap = {}; // key: `${profesional}||${sede}` → calendar_id
-        if (profesionales.length) {
-            const inList = profesionales.map(p => `"${p.replace(/"/g, '\\"')}"`).join(',');
-            const allProfs = await supaFetch(
-                `/profesionales?select=profesional,sede,calendar_id&profesional=in.(${encodeURIComponent(inList)})`
-            ).catch(() => []);
-            (allProfs || []).forEach(p => {
-                const key = `${(p.profesional || '').trim().toLowerCase()}||${(p.sede || '').trim().toLowerCase()}`;
-                if (p.calendar_id) calendarMap[key] = p.calendar_id;
-            });
-        }
+        // Resolución bulk de calendar_id — traer todos y filtrar client-side
+        const calendarMap = {}; // key: `${profesional.lower}||${sede.lower}` → calendar_id
+        const allProfs = await supaFetch('/profesionales?select=profesional,sede,calendar_id').catch(() => []);
+        (allProfs || []).forEach(p => {
+            const key = `${(p.profesional || '').trim().toLowerCase()}||${(p.sede || '').trim().toLowerCase()}`;
+            if (p.calendar_id) calendarMap[key] = p.calendar_id;
+        });
 
         // Fallback por nombre base (sin sede) — sólo si match exacto profesional+sede falla
         async function resolverCalendarId(profesional, sedeRow) {
