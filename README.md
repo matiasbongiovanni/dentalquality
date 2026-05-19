@@ -12,16 +12,46 @@ Landing en HTML/CSS/JS puro deployada en Vercel. Permite a pacientes agendar, re
 
 ## Flujo de datos
 
+### Agendar (alta)
 ```
 Paciente → Landing (index.html)
   1. Carga profesionales/especialidades desde Supabase
-  2. Carga disponibilidad de horarios via /api/ghl → GHL Calendar API
+  2. Carga disponibilidad via /api/ghl → GHL Calendar API
   3. Crea contacto en GHL (si no existe) via /api/ghl
   4. Crea appointment en GHL via /api/ghl
-  5. POSTea a /api/webhook-agendamiento con el payload del turno
-     → /api/webhook-agendamiento valida y reenvía al webhook de n8n
-     → n8n actualiza título del appointment en GHL + persiste en Supabase (personas, registros, registro_dashboard)
+  5. POSTea a /api/webhook-agendamiento (source = "Web Agendamiento")
+     → /api/webhook-agendamiento valida y reenvía al webhook de n8n con HMAC
+     → n8n actualiza título del appointment en GHL + persiste en Supabase
      → Si n8n falla → rollback: cancela appointment en GHL
+```
+
+### Reagendar
+```
+Paciente → tab "Ver Turnos" → DNI + sede
+  1. Listado de turnos próximos (Supabase /registros)
+  2. Resolución de calendar_id por match exacto profesional+sede
+  3. Click "Reagendar":
+     - GET /api/ghl?path=calendars/{id}        (slotDuration)
+     - GET /api/ghl?path=calendars/{id}/free-slots
+  4. Paciente elige fecha+hora (horario actual bloqueado)
+  5. Confirm:
+     - PUT /api/ghl?path=calendars/events/appointments/{id}
+       body: { startTime, endTime, calendarId }
+       → GHL libera el slot anterior automáticamente
+     - POST /api/sync-registro { action: "reschedule", ... }
+       → PATCH Supabase registros.fecha_turno (service-role)
+       → Notify n8n (source = "Web Reagendamiento", best-effort)
+  6. En 409/422 (slot tomado entre selección y confirm): recarga slots
+```
+
+### Cancelar
+```
+Paciente → click "Cancelar" → modal de confirmación
+  1. PUT /api/ghl?path=calendars/events/appointments/{id}
+     body: { appointmentStatus: 'cancelled' }
+  2. POST /api/sync-registro { action: "cancel", ... }
+     → PATCH Supabase registros.estado = 'cancelado'
+     → Notify n8n (source = "Web Cancelacion")
 ```
 
 ## Variables de entorno
@@ -34,9 +64,30 @@ Copiar `.env.example` a `.env` (desarrollo) o configurar en Vercel dashboard (pr
 | `GHL_LOCATION_ID` | ID de la Location en GHL |
 | `SUPABASE_URL` | URL REST de Supabase self-hosted |
 | `SUPABASE_ANON_KEY` | Anon key de Supabase (pública, protegida por RLS) |
+| **`SUPABASE_SERVICE_ROLE_KEY`** | Service-role key. **Server-side only**. Requerida por `/api/sync-registro` para PATCH directo en `registros`. |
 | `N8N_WEBHOOK_URL` | URL del webhook prod de n8n |
 | `N8N_WEBHOOK_SECRET` | (Opcional) Secret HMAC para firmar requests al webhook |
 | `ALLOWED_ORIGIN` | Dominio de prod para CORS (`https://agendamiento.dentalquality.com.ar`) |
+
+## Endpoints serverless
+
+| Ruta | Método | Función |
+|---|---|---|
+| `/api/config` | GET | Devuelve `SUPABASE_URL` + `SUPABASE_ANON_KEY` al cliente |
+| `/api/ghl?path=...` | GET/POST/PUT/PATCH | Proxy a GHL. Path filtrado por allowlist (`api/_lib/ghlAllowlist.js`) |
+| `/api/webhook-agendamiento` | POST | Forwarder a n8n (alta de turno) con `source = "Web Agendamiento"` |
+| `/api/sync-registro` | POST | Sincroniza Supabase + n8n tras reagendar/cancelar. Body: `{ action, appointmentId, startTime?, DNI?, ... }`. Responde 200 si DB **o** n8n sincronizó; 207 si ambos fallaron. |
+
+## Allowlist del proxy GHL
+
+Definido en `api/_lib/ghlAllowlist.js`:
+
+- `GET contacts/search/duplicate`
+- `POST contacts/`
+- `GET|POST calendars/events/appointments`
+- `GET|PUT|PATCH calendars/events/appointments/{id}`
+- `GET calendars/{id}/free-slots`
+- `GET calendars/{id}` ← lectura de `slotDuration` para calcular `endTime` en reagendamientos.
 
 ## Setup local
 

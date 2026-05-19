@@ -50,11 +50,11 @@
                 <p class="mode-label">¿Cómo querés buscar tu turno?</p>
                 <div class="mode-buttons-row">
                     <button type="button" class="mode-btn active" id="btnModeEsp" onclick="setBookingMode('especialidad')">
-                        <span class="mode-icon">🦷</span>
+                        <svg class="mode-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5c0 2.5-2 4.5-4.5 4.5S4.5 9.5 4.5 7z"/><path d="M12 7c0 7 2 9 4 9s4-2 4-9c0-3.5-3-5.5-4-5.5s-4 2-4 5.5z"/><path d="M4.5 7c0 8 1.5 14 4.5 14s4.5-6 4.5-14"/></svg>
                         Por Especialidad
                     </button>
                     <button type="button" class="mode-btn" id="btnModeProf" onclick="setBookingMode('profesional')">
-                        <span class="mode-icon">👨‍⚕️</span>
+                        <svg class="mode-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                         Por Profesional
                     </button>
                 </div>
@@ -170,11 +170,15 @@
                     <div class="form-group full-width">
                         <label class="form-label">Días Disponibles <span class="required">*</span></label>
                         <div class="date-picker-wrapper">
-                            <button type="button" class="scroll-btn" onclick="scrollDates('left')">◀</button>
+                            <button type="button" class="scroll-btn" onclick="scrollDates('left')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                            </button>
                             <div id="datePickerContainer" class="date-picker-container">
                                 <p class="placeholder-text">Cargando agenda...</p>
                             </div>
-                            <button type="button" class="scroll-btn" onclick="scrollDates('right')">▶</button>
+                            <button type="button" class="scroll-btn" onclick="scrollDates('right')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </button>
                         </div>
                         <input type="hidden" id="appointmentDate" required>
                     </div>
@@ -225,7 +229,9 @@
     <!-- Modal Éxito -->
     <div id="successModal" class="modal-overlay">
         <div class="modal-content" style="text-align:center;max-width:380px;">
-            <div class="success-icon">✓</div>
+            <div class="success-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
             <h3>¡Turno agendado!</h3>
             <p class="subtitle-sm">Te enviaremos los detalles a tu WhatsApp.</p>
             <button class="save-button" onclick="cerrarModal('successModal')">Entendido</button>
@@ -235,16 +241,33 @@
     <!-- Modal Reagendar -->
     <div id="rescheduleModal" class="modal-overlay">
         <div class="modal-content">
-            <button class="close-modal" onclick="cerrarModal('rescheduleModal')">&times;</button>
+            <button class="close-modal" onclick="cerrarModal('rescheduleModal')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
             <h3>Reagendar Turno</h3>
+            <div id="rescheduleCurrentInfo" class="reschedule-current"></div>
             <input type="hidden" id="rescheduleAppointmentId">
             <input type="hidden" id="rescheduleCalendarId">
+            <input type="hidden" id="rescheduleCurrentIso">
+            <input type="hidden" id="rescheduleSlotDuration" value="30">
+            <input type="hidden" id="rescheduleProfesional">
+            <input type="hidden" id="rescheduleSede">
+            <input type="hidden" id="rescheduleDni">
+            <input type="hidden" id="rescheduleFullName">
+            <input type="hidden" id="reschedulePhone">
+            <input type="hidden" id="rescheduleObraSocial">
+            <input type="hidden" id="rescheduleTratamiento">
+            <input type="hidden" id="rescheduleCalendarName">
             <div class="form-group" style="margin-top:1rem;">
                 <label class="form-label">Nueva Fecha</label>
                 <div class="date-picker-wrapper">
-                    <button type="button" class="scroll-btn" onclick="scrollRescheduleDates('left')">◀</button>
+                    <button type="button" class="scroll-btn" onclick="scrollRescheduleDates('left')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
                     <div id="rescheduleDatePicker" class="date-picker-container"></div>
-                    <button type="button" class="scroll-btn" onclick="scrollRescheduleDates('right')">▶</button>
+                    <button type="button" class="scroll-btn" onclick="scrollRescheduleDates('right')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
                 </div>
                 <input type="hidden" id="rescheduleDate">
             </div>
@@ -255,8 +278,54 @@
                 </div>
                 <input type="hidden" id="rescheduleTime">
             </div>
-            <button class="save-button" style="margin-top:1.5rem;" onclick="confirmarReagendamiento()">Confirmar Reagendamiento</button>
+            <button class="save-button" style="margin-top:1.5rem;" id="confirmRescheduleBtn">Confirmar Reagendamiento</button>
             <div id="rescheduleStatus" class="status-msg"></div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmar Cancelación -->
+    <div id="confirmCancelModal" class="modal-overlay">
+        <div class="modal-content" style="text-align:center;max-width:400px;">
+            <div class="warning-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            </div>
+            <h3>¿Cancelar este turno?</h3>
+            <p class="subtitle-sm" id="confirmCancelInfo">Esta acción no se puede deshacer.</p>
+            <input type="hidden" id="cancelAppointmentId">
+            <input type="hidden" id="cancelDni">
+            <input type="hidden" id="cancelFullName">
+            <input type="hidden" id="cancelPhone">
+            <input type="hidden" id="cancelTratamiento">
+            <input type="hidden" id="cancelCalendarName">
+            <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
+                <button class="save-button" style="flex:1;background:#f1f5f9;color:var(--text-main);" onclick="cerrarModal('confirmCancelModal')">No, mantener</button>
+                <button class="save-button" style="flex:1;background:var(--danger);" id="confirmCancelBtn">Sí, cancelar</button>
+            </div>
+            <div id="confirmCancelStatus" class="status-msg"></div>
+        </div>
+    </div>
+
+    <!-- Modal Reagendamiento Éxito -->
+    <div id="rescheduleSuccessModal" class="modal-overlay">
+        <div class="modal-content" style="text-align:center;max-width:380px;">
+            <div class="success-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <h3>¡Turno reagendado!</h3>
+            <p class="subtitle-sm" id="rescheduleSuccessInfo">Te enviaremos los detalles a tu WhatsApp.</p>
+            <button class="save-button" onclick="cerrarModal('rescheduleSuccessModal')">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Modal Cancelación Éxito -->
+    <div id="cancelSuccessModal" class="modal-overlay">
+        <div class="modal-content" style="text-align:center;max-width:380px;">
+            <div class="success-icon" style="background:#fee2e2;color:var(--danger);">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <h3>Turno cancelado</h3>
+            <p class="subtitle-sm">Esperamos verte pronto.</p>
+            <button class="save-button" onclick="cerrarModal('cancelSuccessModal')">Entendido</button>
         </div>
     </div>
 

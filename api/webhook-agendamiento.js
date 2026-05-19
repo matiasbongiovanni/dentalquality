@@ -1,6 +1,5 @@
-const fetch = require('node-fetch');
-const crypto = require('crypto');
 const { validateAgendamiento } = require('./_lib/validate');
+const { notifyN8n } = require('./_lib/notifyN8n');
 
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
 
@@ -19,56 +18,31 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Método no permitido' });
     }
 
-    const N8N_WEBHOOK_URL = (process.env.N8N_WEBHOOK_URL || '').trim();
-    if (!N8N_WEBHOOK_URL) {
-        return res.status(500).json({ error: 'N8N_WEBHOOK_URL no configurada' });
-    }
-
     const body = req.body;
-
     const validation = validateAgendamiento(body);
     if (!validation.ok) {
         return res.status(400).json({ error: 'Payload inválido', errors: validation.errors });
     }
 
-    // Forzar source para que el workflow de n8n lo procese
-    const payload = {
-        ...body,
-        calendar: {
-            ...body.calendar,
-            last_updated_by_meta: { source: 'Web Agendamiento' }
-        }
-    };
+    const result = await notifyN8n(body, 'Web Agendamiento');
 
-    const headers = { 'Content-Type': 'application/json' };
-    const secret = (process.env.N8N_WEBHOOK_SECRET || '').trim();
-    if (secret) {
-        const sig = crypto
-            .createHmac('sha256', secret)
-            .update(JSON.stringify(payload))
-            .digest('hex');
-        headers['X-Meteoro-Signature'] = sig;
+    const appointmentId = body.calendar?.appointmentId;
+    const dni = String(body.DNI || '').slice(0, 4) + '****';
+    console.log(JSON.stringify({
+        action: 'agendamiento',
+        appointmentId,
+        dni,
+        n8nStatus: result.status,
+        n8nOk: result.ok,
+        durationMs: result.durationMs
+    }));
+
+    if (result.skipped) {
+        return res.status(500).json({ error: 'N8N_WEBHOOK_URL no configurada' });
+    }
+    if (!result.ok) {
+        return res.status(502).json({ error: 'El workflow no procesó la solicitud', n8nStatus: result.status });
     }
 
-    const start = Date.now();
-    try {
-        const n8nRes = await fetch(N8N_WEBHOOK_URL, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(payload)
-        });
-
-        const durationMs = Date.now() - start;
-        const appointmentId = body.calendar?.appointmentId;
-        const dni = String(body.DNI || '').slice(0, 4) + '****';
-        console.log(JSON.stringify({ appointmentId, dni, status: n8nRes.status, durationMs }));
-
-        if (!n8nRes.ok) {
-            return res.status(502).json({ error: 'El workflow no procesó la solicitud', n8nStatus: n8nRes.status });
-        }
-
-        res.status(200).json({ ok: true });
-    } catch (error) {
-        res.status(502).json({ error: 'No se pudo contactar el webhook de n8n' });
-    }
+    res.status(200).json({ ok: true });
 };

@@ -576,29 +576,30 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
 
     // Validaciones
     if (!nombre || !apellido || !dni || !telRaw) {
-        setStatus(status, '⚠️ Completá todos los campos obligatorios.');
+        setStatus(status, 'Completá todos los campos obligatorios.');
         return;
     }
     if (!/^\d{7,8}$/.test(dni)) {
-        setStatus(status, '⚠️ El DNI debe tener 7 u 8 dígitos numéricos.');
+        setStatus(status, 'El DNI debe tener 7 u 8 dígitos numéricos.');
         return;
     }
     if (!/^\d{10}$/.test(telRaw)) {
-        setStatus(status, '⚠️ El teléfono debe tener 10 dígitos (sin el 549).');
+        setStatus(status, 'El teléfono debe tener 10 dígitos (sin el 549).');
         return;
     }
     if (!tratamiento) {
-        setStatus(status, '⚠️ Seleccioná el tratamiento.');
+        setStatus(status, 'Seleccioná el tratamiento.');
         return;
     }
     if (!startTime || !slotSeleccionado) {
-        setStatus(status, '⚠️ Seleccioná fecha y horario.');
+        setStatus(status, 'Seleccioná fecha y horario.');
         return;
     }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Procesando...';
     status.textContent = '';
+    status.className = 'status-msg';
 
     let appointmentId = null;
 
@@ -682,7 +683,7 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         disponibilidadGlobal = {};
         slotSeleccionado = null;
     } catch (e) {
-        setStatus(status, `❌ ${e.message || 'Error al agendar.'}`);
+        setStatus(status, e.message || 'Error al agendar.', 'var(--danger)');
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Confirmar Turno';
@@ -692,20 +693,43 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
 function setStatus(el, msg, color) {
     el.textContent = msg;
     el.style.color = color || 'var(--danger)';
+    el.classList.add('active');
 }
 
 // =============================================
 // 5. BUSCAR MIS TURNOS POR DNI (Supabase)
 // =============================================
+function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
+function normalizarPersonaNombre(nombre) {
+    return String(nombre || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function parsearFechaTurno(raw) {
+    if (!raw) return null;
+    let d;
+    if (raw.includes('/')) {
+        const parts = raw.split(/[/\s:-]/);
+        d = parts.length >= 3 ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`) : new Date(raw);
+    } else {
+        d = new Date(raw.includes('T') ? raw : raw + 'T00:00:00');
+    }
+    return isNaN(d.getTime()) ? null : d;
+}
+
 async function buscarMisTurnos() {
     const sede = document.getElementById('consultaSede').value;
     const dni = document.getElementById('consultaDNI').value.trim();
     const container = document.getElementById('resultadoTurnos');
 
-    if (!sede) { container.innerHTML = '<p style="color:var(--danger);text-align:center;">Seleccioná una sede.</p>'; return; }
-    if (!dni)  { container.innerHTML = '<p style="color:var(--danger);text-align:center;">Ingresá tu DNI.</p>'; return; }
+    if (!sede) { container.innerHTML = '<p class="status-error">Seleccioná una sede.</p>'; return; }
+    if (!dni)  { container.innerHTML = '<p class="status-error">Ingresá tu DNI.</p>'; return; }
 
-    container.innerHTML = '<p class="loading-spinner" style="text-align:center;padding:2rem;">Buscando turnos...</p>';
+    container.innerHTML = '<p class="loading-spinner">Buscando turnos...</p>';
 
     try {
         const ahora = new Date();
@@ -716,27 +740,28 @@ async function buscarMisTurnos() {
             `/registros?select=*&dni=eq.${encodeURIComponent(dni)}&sede=eq.${sede}&order=fecha_turno.asc&limit=100`
         ).catch(() => []);
 
-        const personas = await supaFetch(`/personas?select=telefono,nombre&dni=eq.${encodeURIComponent(dni)}&limit=5`).catch(() => []);
+        const personas = await supaFetch(`/personas?select=telefono,nombre,obra_social&dni=eq.${encodeURIComponent(dni)}&limit=5`).catch(() => []);
 
         const telefonos = new Set();
+        const personasInfo = { telefono: '', fullName: '', obraSocial: '' };
         if (personas && personas.length) {
+            const p0 = personas[0];
+            personasInfo.telefono = String(p0.telefono || '').replace(/\D/g, '');
+            personasInfo.fullName = (p0.nombre || '').trim();
+            personasInfo.obraSocial = p0.obra_social || '';
+
             personas.forEach(p => {
                 const raw = String(p.telefono || '').replace(/\D/g, '');
                 if (!raw) return;
                 telefonos.add(raw);
-                telefonos.add('+' + raw);
                 if (raw.startsWith('549')) {
                     telefonos.add(raw.slice(3));
                     telefonos.add(raw.slice(2));
-                    telefonos.add('+' + raw.slice(3));
                 } else if (raw.startsWith('54')) {
                     telefonos.add(raw.slice(2));
-                    telefonos.add('+' + raw.slice(2));
                 } else {
                     telefonos.add('54' + raw);
                     telefonos.add('549' + raw);
-                    telefonos.add('+54' + raw);
-                    telefonos.add('+549' + raw);
                 }
             });
         }
@@ -759,16 +784,8 @@ async function buscarMisTurnos() {
         });
 
         turnos = turnos.filter(t => {
-            const raw = t.fecha_turno || t.fecha || '';
-            if (!raw) return false;
-            let d;
-            if (raw.includes('/')) {
-                const parts = raw.split(/[/\s:-]/);
-                d = parts.length >= 3 ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`) : new Date(raw);
-            } else {
-                d = new Date(raw.includes('T') ? raw : raw + 'T00:00:00');
-            }
-            if (isNaN(d.getTime())) return true;
+            const d = parsearFechaTurno(t.fecha_turno || t.fecha || '');
+            if (!d) return false;
             return d >= hoyArg;
         });
 
@@ -777,9 +794,35 @@ async function buscarMisTurnos() {
             return;
         }
 
-        container.innerHTML = turnos.map(t => {
+        // Resolución bulk de calendar_id por profesional+sede
+        const profesionales = [...new Set(turnos.map(t => (t.profesional || '').trim()).filter(Boolean))];
+        const calendarMap = {}; // key: `${profesional}||${sede}` → calendar_id
+        if (profesionales.length) {
+            const inList = profesionales.map(p => `"${p.replace(/"/g, '\\"')}"`).join(',');
+            const allProfs = await supaFetch(
+                `/profesionales?select=profesional,sede,calendar_id&profesional=in.(${encodeURIComponent(inList)})`
+            ).catch(() => []);
+            (allProfs || []).forEach(p => {
+                const key = `${(p.profesional || '').trim().toLowerCase()}||${(p.sede || '').trim().toLowerCase()}`;
+                if (p.calendar_id) calendarMap[key] = p.calendar_id;
+            });
+        }
+
+        // Fallback por nombre base (sin sede) — sólo si match exacto profesional+sede falla
+        async function resolverCalendarId(profesional, sedeRow) {
+            const exact = calendarMap[`${profesional.trim().toLowerCase()}||${sedeRow.trim().toLowerCase()}`];
+            if (exact) return exact;
+            const base = profesional.split(' - ')[0].trim();
+            const candidatos = await supaFetch(
+                `/profesionales?select=profesional,sede,calendar_id&profesional=ilike.*${encodeURIComponent(base)}*&sede=eq.${encodeURIComponent(sedeRow)}&limit=1`
+            ).catch(() => []);
+            return candidatos.length ? candidatos[0].calendar_id : '';
+        }
+
+        const cards = await Promise.all(turnos.map(async t => {
             const raw = t.fecha_turno || t.fecha || '';
-            const start = new Date(raw.includes('T') ? raw : raw + 'T00:00:00');
+            const start = parsearFechaTurno(raw) || new Date();
+            const isoStart = start.toISOString();
             const fechaStr = start.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: TZ });
             const horaStr = raw.includes('T') ? start.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ }) : (t.hora || '');
             const eventId = t.event_id || t.eventId || t.id || '';
@@ -795,145 +838,293 @@ async function buscarMisTurnos() {
                 pendiente: { label: 'Pendiente', cls: 'status-pending' }
             };
             const st = statusMap[rawStatus] || { label: rawStatus, cls: 'status-pending' };
-            const sedeEscapada = (t.sede || '').replace(/'/g, '');
-            const profEscapado = (t.profesional || '').replace(/'/g, '');
+
+            const sedeRow = (t.sede || sede || '').trim();
+            const profesionalRow = (t.profesional || '').trim();
+            const calendarId = (!isCancelled && profesionalRow) ? await resolverCalendarId(profesionalRow, sedeRow) : '';
+
+            const tratamiento = t.tratamiento || t.motivo || '';
+            const calendarName = `${profesionalRow}${sedeRow ? ' - ' + sedeRow : ''}`;
+            const phone = personasInfo.telefono || String(t.numero || '').replace(/\D/g, '');
+            const fullName = personasInfo.fullName || t.nombre || '';
+            const obraSocial = personasInfo.obraSocial || t.obra_social || '';
+
+            const actionsHtml = (!isCancelled && eventId) ? `
+                <div class="turno-actions">
+                    <button class="btn-reagendar"
+                            data-action="reschedule"
+                            data-event-id="${escapeHtml(eventId)}"
+                            data-calendar-id="${escapeHtml(calendarId)}"
+                            data-current-iso="${escapeHtml(isoStart)}"
+                            data-profesional="${escapeHtml(profesionalRow)}"
+                            data-sede="${escapeHtml(sedeRow)}"
+                            data-tratamiento="${escapeHtml(tratamiento)}"
+                            data-calendar-name="${escapeHtml(calendarName)}"
+                            data-dni="${escapeHtml(dni)}"
+                            data-full-name="${escapeHtml(fullName)}"
+                            data-phone="${escapeHtml(phone)}"
+                            data-obra-social="${escapeHtml(obraSocial)}"
+                            ${calendarId ? '' : 'disabled title="No se pudo identificar el calendario. Contactanos por WhatsApp."'}>Reagendar</button>
+                    <button class="btn-cancelar"
+                            data-action="cancel"
+                            data-event-id="${escapeHtml(eventId)}"
+                            data-tratamiento="${escapeHtml(tratamiento)}"
+                            data-fecha="${escapeHtml(fechaStr)}${horaStr ? ' a las ' + escapeHtml(horaStr) : ''}"
+                            data-dni="${escapeHtml(dni)}"
+                            data-full-name="${escapeHtml(fullName)}"
+                            data-phone="${escapeHtml(phone)}"
+                            data-calendar-name="${escapeHtml(calendarName)}">Cancelar</button>
+                </div>` : '';
 
             return `
                 <div class="turno-card">
                     <div class="turno-header">
-                        <span class="turno-fecha">${fechaStr}</span>
-                        ${horaStr ? `<span class="turno-hora">${horaStr}</span>` : ''}
+                        <span class="turno-fecha">${escapeHtml(fechaStr)}</span>
+                        ${horaStr ? `<span class="turno-hora">${escapeHtml(horaStr)}</span>` : ''}
                     </div>
                     <div class="turno-info">
-                        <div><div class="turno-info-label">Paciente</div><div>${t.nombre || 'N/A'}</div></div>
-                        <div><div class="turno-info-label">Profesional</div><div>${t.profesional || 'N/A'}</div></div>
-                        <div><div class="turno-info-label">Sede</div><div>${t.sede || sede}</div></div>
-                        <div><div class="turno-info-label">Tratamiento</div><div>${t.tratamiento || t.motivo || 'N/A'}</div></div>
-                        <div><div class="turno-info-label">Estado</div><span class="status-badge ${st.cls}">${st.label}</span></div>
+                        <div><div class="turno-info-label">Paciente</div><div>${escapeHtml(t.nombre || 'N/A')}</div></div>
+                        <div><div class="turno-info-label">Profesional</div><div>${escapeHtml(profesionalRow || 'N/A')}</div></div>
+                        <div><div class="turno-info-label">Sede</div><div>${escapeHtml(sedeRow || sede)}</div></div>
+                        <div><div class="turno-info-label">Tratamiento</div><div>${escapeHtml(tratamiento || 'N/A')}</div></div>
+                        <div><div class="turno-info-label">Estado</div><span class="status-badge ${st.cls}">${escapeHtml(st.label)}</span></div>
                     </div>
-                    ${!isCancelled && eventId ? `
-                    <div class="turno-actions">
-                        <button class="btn-reagendar" onclick="abrirReagendamiento('${eventId}', '${profEscapado}', '${sedeEscapada}')">Reagendar</button>
-                        <button class="btn-cancelar" onclick="cancelarTurno('${eventId}')">Cancelar</button>
-                    </div>` : ''}
+                    ${actionsHtml}
                 </div>`;
-        }).join('');
+        }));
+
+        container.innerHTML = cards.join('');
     } catch (e) {
-        container.innerHTML = `<div class="no-results" style="color:var(--danger);">Error: ${e.message}</div>`;
+        container.innerHTML = `<div class="no-results" style="color:var(--danger);">Error: ${escapeHtml(e.message)}</div>`;
     }
 }
+
+// Event delegation para los botones de cada turno
+document.getElementById('resultadoTurnos')?.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn || btn.disabled) return;
+    const action = btn.dataset.action;
+    if (action === 'reschedule') {
+        abrirReagendamiento(btn.dataset);
+    } else if (action === 'cancel') {
+        abrirConfirmacionCancelar(btn.dataset);
+    }
+});
 
 // =============================================
 // 6. CANCELAR TURNO
 // =============================================
-async function cancelarTurno(appointmentId) {
-    if (!confirm('¿Estás seguro de que querés cancelar este turno?')) return;
+function abrirConfirmacionCancelar(d) {
+    document.getElementById('cancelAppointmentId').value = d.eventId || '';
+    document.getElementById('cancelDni').value = d.dni || '';
+    document.getElementById('cancelFullName').value = d.fullName || '';
+    document.getElementById('cancelPhone').value = d.phone || '';
+    document.getElementById('cancelTratamiento').value = d.tratamiento || '';
+    document.getElementById('cancelCalendarName').value = d.calendarName || '';
+    const info = document.getElementById('confirmCancelInfo');
+    info.textContent = d.fecha
+        ? `Vas a cancelar el turno del ${d.fecha}. Esta acción no se puede deshacer.`
+        : 'Esta acción no se puede deshacer.';
+    document.getElementById('confirmCancelStatus').textContent = '';
+    document.getElementById('confirmCancelModal').classList.add('active');
+}
+
+document.getElementById('confirmCancelBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('confirmCancelBtn');
+    const status = document.getElementById('confirmCancelStatus');
+    const appointmentId = document.getElementById('cancelAppointmentId').value;
+    if (!appointmentId) return;
+
+    btn.disabled = true;
+    btn.classList.add('btn-loading');
+    status.textContent = 'Cancelando...';
+    status.style.color = 'var(--primary)';
+
     try {
         await ghlFetch(`calendars/events/appointments/${appointmentId}`, {
             method: 'PUT',
             body: JSON.stringify({ appointmentStatus: 'cancelled' })
         });
-        alert('Turno cancelado correctamente.');
+
+        // Sync interno (best-effort: no bloquea UX si falla)
+        const [first_name, ...rest] = (document.getElementById('cancelFullName').value || '').split(' ');
+        await fetch('/api/sync-registro', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'cancel',
+                appointmentId,
+                DNI: document.getElementById('cancelDni').value,
+                first_name: first_name || '',
+                last_name: rest.join(' ') || '',
+                full_name: document.getElementById('cancelFullName').value,
+                phone: document.getElementById('cancelPhone').value,
+                Tratamiento: document.getElementById('cancelTratamiento').value,
+                calendarName: document.getElementById('cancelCalendarName').value
+            })
+        }).catch(err => console.warn('[sync-registro cancel]', err));
+
+        cerrarModal('confirmCancelModal');
+        document.getElementById('cancelSuccessModal').classList.add('active');
         buscarMisTurnos();
     } catch (e) {
-        alert('Error al cancelar: ' + (e.message || 'Intentá de nuevo.'));
+        status.textContent = e.message || 'Error al cancelar.';
+        status.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('btn-loading');
     }
-}
+});
 
 // =============================================
 // 7. REAGENDAR TURNO
 // =============================================
-async function abrirReagendamiento(appointmentId, profesionalName, sede) {
-    document.getElementById('rescheduleAppointmentId').value = appointmentId;
+let _rescheduleSlotsMap = {}; // cache de slots de la apertura actual
+
+async function abrirReagendamiento(d) {
+    const modal = document.getElementById('rescheduleModal');
+    const container = document.getElementById('rescheduleDatePicker');
+    const status = document.getElementById('rescheduleStatus');
+
+    // Hidden inputs
+    document.getElementById('rescheduleAppointmentId').value = d.eventId || '';
+    document.getElementById('rescheduleCalendarId').value = d.calendarId || '';
+    document.getElementById('rescheduleCurrentIso').value = d.currentIso || '';
+    document.getElementById('rescheduleProfesional').value = d.profesional || '';
+    document.getElementById('rescheduleSede').value = d.sede || '';
+    document.getElementById('rescheduleDni').value = d.dni || '';
+    document.getElementById('rescheduleFullName').value = d.fullName || '';
+    document.getElementById('reschedulePhone').value = d.phone || '';
+    document.getElementById('rescheduleObraSocial').value = d.obraSocial || '';
+    document.getElementById('rescheduleTratamiento').value = d.tratamiento || '';
+    document.getElementById('rescheduleCalendarName').value = d.calendarName || '';
     document.getElementById('rescheduleDate').value = '';
     document.getElementById('rescheduleTime').value = '';
+    document.getElementById('rescheduleSlotDuration').value = '30';
     document.getElementById('rescheduleTimeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha.</p>';
-    document.getElementById('rescheduleStatus').textContent = '';
-    document.getElementById('rescheduleModal').classList.add('active');
+    status.textContent = '';
+    status.className = 'status-msg';
 
-    const container = document.getElementById('rescheduleDatePicker');
+    // Info del turno actual
+    const infoEl = document.getElementById('rescheduleCurrentInfo');
+    if (d.currentIso) {
+        const dt = new Date(d.currentIso);
+        const fechaStr = dt.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ });
+        const horaStr = dt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+        infoEl.innerHTML = `<strong>Turno actual:</strong> ${escapeHtml(fechaStr)} a las ${escapeHtml(horaStr)} — ${escapeHtml(d.profesional || '')}`;
+    } else {
+        infoEl.innerHTML = '';
+    }
+
+    modal.classList.add('active');
     container.innerHTML = '<p class="placeholder-text" style="margin:auto;">Cargando agenda...</p>';
 
+    const calendarId = d.calendarId;
+    if (!calendarId) {
+        container.innerHTML = '<p style="color:var(--danger);margin:auto;">No se identificó el calendario del profesional. Contactanos por WhatsApp.</p>';
+        return;
+    }
+
     try {
-        let calendarId = '';
-
-        if (profesionalName) {
-            const nombreBase = profesionalName.split(' - ')[0].trim();
-            const profs = await supaFetch(`/profesionales?select=calendar_id&profesional=ilike.*${encodeURIComponent(nombreBase)}*&limit=1`).catch(() => []);
-            if (profs.length) calendarId = profs[0].calendar_id;
-        }
-
-        if (!calendarId && sede) {
-            const profsBySede = await supaFetch(`/profesionales?select=calendar_id&sede=ilike.*${encodeURIComponent(sede)}*&limit=1`).catch(() => []);
-            if (profsBySede.length) calendarId = profsBySede[0].calendar_id;
-        }
-
-        document.getElementById('rescheduleCalendarId').value = calendarId;
-
-        if (!calendarId) {
-            container.innerHTML = '<p style="color:var(--warning);margin:auto;">No se encontró el calendario del profesional.</p>';
-            return;
-        }
-
         const now = Date.now();
         const end = now + 60 * 24 * 60 * 60 * 1000;
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const data = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
-        const slotsMap = data?.slots || data?.data || data || {};
 
-        container.innerHTML = '';
-        const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-        const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        const fechas = Object.keys(slotsMap).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
-        let hayDias = false;
+        // Fetch en paralelo: detalle del calendario (slotDuration) + free-slots
+        const [calInfo, slotsData] = await Promise.all([
+            ghlFetch(`calendars/${calendarId}`).catch(() => null),
+            ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`)
+        ]);
 
-        fechas.forEach(dateStr => {
-            const slots = slotsMap[dateStr]?.slots || slotsMap[dateStr];
-            if (!Array.isArray(slots) || !slots.length) return;
-            hayDias = true;
-            const [y, m, d] = dateStr.split('-');
-            const dateObj = new Date(y, m - 1, d);
-            const card = document.createElement('div');
-            card.className = 'date-card has-slots';
-            card.onclick = () => seleccionarFechaReagendar(dateStr, card, slotsMap);
-            card.innerHTML = `<span class="day-name">${days[dateObj.getDay()]}</span><span class="day-number">${d}</span><span class="month-year">${months[dateObj.getMonth()]}</span>`;
-            container.appendChild(card);
-        });
+        const slotDuration = parseInt(
+            calInfo?.calendar?.slotDuration ||
+            calInfo?.slotDuration ||
+            calInfo?.calendar?.slot_duration ||
+            30,
+            10
+        ) || 30;
+        document.getElementById('rescheduleSlotDuration').value = String(slotDuration);
 
-        if (!hayDias) container.innerHTML = '<p class="placeholder-text" style="margin:auto;">No hay días disponibles.</p>';
+        _rescheduleSlotsMap = slotsData?.slots || slotsData?.data || slotsData || {};
+        renderRescheduleDates(_rescheduleSlotsMap, d.currentIso);
     } catch (e) {
-        container.innerHTML = '<p style="color:red;margin:auto;">Error al cargar agenda.</p>';
+        container.innerHTML = `<p style="color:var(--danger);margin:auto;">Error al cargar agenda: ${escapeHtml(e.message)}</p>`;
     }
 }
 
-function seleccionarFechaReagendar(dateStr, cardEl, avail) {
+function renderRescheduleDates(slotsMap, currentIso) {
+    const container = document.getElementById('rescheduleDatePicker');
+    container.innerHTML = '';
+    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const fechas = Object.keys(slotsMap).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+    let hayDias = false;
+    const currentDateStr = currentIso ? new Date(currentIso).toISOString().slice(0, 10) : '';
+
+    fechas.forEach(dateStr => {
+        const raw = slotsMap[dateStr]?.slots || slotsMap[dateStr];
+        if (!Array.isArray(raw) || !raw.length) return;
+        hayDias = true;
+        const [y, m, dd] = dateStr.split('-');
+        const dateObj = new Date(y, m - 1, dd);
+        const card = document.createElement('div');
+        card.className = 'date-card has-slots';
+        if (dateStr === currentDateStr) card.classList.add('is-current-day');
+        card.dataset.date = dateStr;
+        card.onclick = () => seleccionarFechaReagendar(dateStr, card);
+        card.innerHTML = `<span class="day-name">${days[dateObj.getDay()]}</span><span class="day-number">${dd}</span><span class="month-year">${months[dateObj.getMonth()]}</span>`;
+        container.appendChild(card);
+    });
+
+    if (!hayDias) container.innerHTML = '<p class="placeholder-text" style="margin:auto;">No hay días disponibles.</p>';
+}
+
+function seleccionarFechaReagendar(dateStr, cardEl) {
     document.getElementById('rescheduleDate').value = dateStr;
     document.getElementById('rescheduleTime').value = '';
     document.querySelectorAll('#rescheduleDatePicker .date-card').forEach(c => c.classList.remove('selected'));
     if (cardEl) cardEl.classList.add('selected');
 
-    const slotsData = avail[dateStr]?.slots || avail[dateStr];
+    const currentIso = document.getElementById('rescheduleCurrentIso').value;
+    const slotsData = _rescheduleSlotsMap[dateStr]?.slots || _rescheduleSlotsMap[dateStr];
     const container = document.getElementById('rescheduleTimeSlotsContainer');
     container.innerHTML = '';
+
     if (!Array.isArray(slotsData) || !slotsData.length) {
         container.innerHTML = '<p class="placeholder-text">No hay horarios.</p>';
         return;
     }
 
+    const seen = new Set();
     const parsed = [];
     slotsData.forEach(slot => {
-        const d = new Date(typeof slot === 'string' ? slot : (slot.startTime || slot));
+        const iso = typeof slot === 'string' ? slot : (slot.startTime || slot);
+        const d = new Date(iso);
         if (isNaN(d.getTime())) return;
         const tv = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-        if (!parsed.find(s => s.tv === tv)) parsed.push({ tv, iso: typeof slot === 'string' ? slot : (slot.startTime || slot), d });
+        const key = iso;
+        if (seen.has(key)) return;
+        seen.add(key);
+        parsed.push({ tv, iso, d });
     });
     parsed.sort((a, b) => a.d - b.d);
+
+    if (!parsed.length) {
+        container.innerHTML = '<p class="placeholder-text">No hay horarios.</p>';
+        return;
+    }
 
     parsed.forEach(s => {
         const btn = document.createElement('div');
         btn.className = 'time-slot-btn';
-        btn.textContent = s.tv;
+        const isCurrent = currentIso && new Date(currentIso).getTime() === s.d.getTime();
+        if (isCurrent) {
+            btn.classList.add('is-current');
+            btn.title = 'Este es tu horario actual';
+        }
+        btn.textContent = s.tv + (isCurrent ? ' (actual)' : '');
         btn.onclick = () => {
+            if (isCurrent) return; // bloquear selección del horario actual
             container.querySelectorAll('.time-slot-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             document.getElementById('rescheduleTime').value = s.iso;
@@ -942,28 +1133,108 @@ function seleccionarFechaReagendar(dateStr, cardEl, avail) {
     });
 }
 
+document.getElementById('confirmRescheduleBtn')?.addEventListener('click', confirmarReagendamiento);
+
 async function confirmarReagendamiento() {
-    const appointmentId = document.getElementById('rescheduleAppointmentId').value;
-    const startTime = document.getElementById('rescheduleTime').value;
+    const btn = document.getElementById('confirmRescheduleBtn');
     const status = document.getElementById('rescheduleStatus');
+    const appointmentId = document.getElementById('rescheduleAppointmentId').value;
+    const calendarId = document.getElementById('rescheduleCalendarId').value;
+    const startTime = document.getElementById('rescheduleTime').value;
+    const currentIso = document.getElementById('rescheduleCurrentIso').value;
+    const slotDuration = parseInt(document.getElementById('rescheduleSlotDuration').value, 10) || 30;
 
-    if (!startTime) { status.textContent = '⚠️ Seleccioná fecha y horario.'; status.style.color = 'var(--danger)'; return; }
+    if (!appointmentId || !calendarId) {
+        setRescheduleStatus(status, 'Datos del turno incompletos. Cerrá el modal y reintentá.', 'danger');
+        return;
+    }
+    if (!startTime) {
+        setRescheduleStatus(status, 'Seleccioná fecha y horario.', 'danger');
+        return;
+    }
+    if (currentIso && new Date(currentIso).getTime() === new Date(startTime).getTime()) {
+        setRescheduleStatus(status, 'Ese es tu horario actual. Elegí uno distinto.', 'danger');
+        return;
+    }
 
-    status.textContent = 'Reagendando...';
-    status.style.color = 'var(--primary)';
+    const startMs = new Date(startTime).getTime();
+    const endTime = new Date(startMs + slotDuration * 60_000).toISOString();
+
+    btn.disabled = true;
+    btn.classList.add('btn-loading');
+    setRescheduleStatus(status, 'Reagendando...', 'primary');
 
     try {
+        // 1. PUT a GHL — esto libera el slot anterior automáticamente
         await ghlFetch(`calendars/events/appointments/${appointmentId}`, {
             method: 'PUT',
-            body: JSON.stringify({ startTime })
+            body: JSON.stringify({ startTime, endTime, calendarId })
         });
+
+        // 2. Sync interno (DB + n8n). Best-effort: no rompe la UX si falla.
+        const fullName = document.getElementById('rescheduleFullName').value || '';
+        const [first_name, ...rest] = fullName.split(' ');
+        const syncRes = await fetch('/api/sync-registro', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'reschedule',
+                appointmentId,
+                startTime,
+                DNI: document.getElementById('rescheduleDni').value,
+                first_name: first_name || '',
+                last_name: rest.join(' ') || '',
+                full_name: fullName,
+                phone: document.getElementById('reschedulePhone').value,
+                'Obra Social': document.getElementById('rescheduleObraSocial').value,
+                Tratamiento: document.getElementById('rescheduleTratamiento').value,
+                calendarName: document.getElementById('rescheduleCalendarName').value
+            })
+        }).catch(err => { console.warn('[sync-registro reschedule]', err); return null; });
+
+        let syncWarning = '';
+        if (syncRes && !syncRes.ok && syncRes.status === 207) {
+            syncWarning = ' (la sincronía interna puede demorar unos minutos)';
+        }
+
         cerrarModal('rescheduleModal');
-        alert('Turno reagendado correctamente.');
+        const successInfo = document.getElementById('rescheduleSuccessInfo');
+        const newDt = new Date(startTime);
+        const fechaStr = newDt.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ });
+        const horaStr = newDt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+        if (successInfo) {
+            successInfo.textContent = `Tu nuevo turno es el ${fechaStr} a las ${horaStr}.${syncWarning}`;
+        }
+        document.getElementById('rescheduleSuccessModal').classList.add('active');
         buscarMisTurnos();
     } catch (e) {
-        status.textContent = `❌ ${e.message || 'Error al reagendar.'}`;
-        status.style.color = 'var(--danger)';
+        const msg = e.message || '';
+        // Detectar conflicto de slot (ya tomado)
+        if (/conflict|409|422|not available|unavailable|ocupad/i.test(msg)) {
+            setRescheduleStatus(status, 'Ese horario se ocupó. Elegí otro.', 'danger');
+            // Recargar slots
+            try {
+                const now = Date.now();
+                const end = now + 60 * 24 * 60 * 60 * 1000;
+                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const slotsData = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
+                _rescheduleSlotsMap = slotsData?.slots || slotsData?.data || slotsData || {};
+                renderRescheduleDates(_rescheduleSlotsMap, currentIso);
+                document.getElementById('rescheduleTimeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha.</p>';
+            } catch (_) {}
+        } else {
+            setRescheduleStatus(status, msg || 'Error al reagendar. Intentá de nuevo.', 'danger');
+        }
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('btn-loading');
     }
+}
+
+function setRescheduleStatus(el, msg, kind) {
+    el.textContent = msg;
+    el.classList.add('active');
+    el.style.color = kind === 'danger' ? 'var(--danger)' : kind === 'primary' ? 'var(--primary)' : 'var(--success)';
 }
 
 // =============================================
@@ -1002,7 +1273,7 @@ async function buscarPacientePorDni(dni) {
             else { sel.value = 'Otra'; }
         }
 
-        statusEl.textContent = '✓ Datos encontrados';
+        statusEl.textContent = 'Datos encontrados';
         statusEl.style.color = 'var(--success)';
         setTimeout(() => { statusEl.textContent = ''; }, 3000);
     } catch (_) {
