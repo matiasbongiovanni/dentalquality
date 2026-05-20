@@ -697,7 +697,7 @@ function setStatus(el, msg, color) {
 }
 
 // =============================================
-// 5. BUSCAR MIS TURNOS POR DNI (Supabase)
+// 5. BUSCAR MIS TURNOS POR DNI (via GHL)
 // =============================================
 function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({
@@ -705,20 +705,11 @@ function escapeHtml(str) {
     }[c]));
 }
 
-function normalizarPersonaNombre(nombre) {
-    return String(nombre || '').trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function parsearFechaTurno(raw) {
+// GHL devuelve fechas como "YYYY-MM-DD HH:mm:ss" en UTC
+function ghlTimeToIso(raw) {
     if (!raw) return null;
-    let d;
-    if (raw.includes('/')) {
-        const parts = raw.split(/[/\s:-]/);
-        d = parts.length >= 3 ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`) : new Date(raw);
-    } else {
-        d = new Date(raw.includes('T') ? raw : raw + 'T00:00:00');
-    }
-    return isNaN(d.getTime()) ? null : d;
+    // "2026-05-29 15:45:00" → "2026-05-29T15:45:00Z"
+    return raw.replace(' ', 'T') + 'Z';
 }
 
 async function buscarMisTurnos() {
@@ -732,24 +723,18 @@ async function buscarMisTurnos() {
     container.innerHTML = '<p class="loading-spinner">Buscando turnos...</p>';
 
     try {
-        const ahora = new Date();
-        const hoyArg = new Date(ahora.toLocaleString('en-US', { timeZone: TZ }));
-        hoyArg.setHours(0, 0, 0, 0);
-
-        let turnosPorDni = await supaFetch(
-            `/registros?select=*&dni=eq.${encodeURIComponent(dni)}&sede=eq.${sede}&order=fecha_turno.asc&limit=100`
+        // 1. Buscar teléfono en personas (Supabase) por DNI
+        const personas = await supaFetch(
+            `/personas?select=telefono,nombre,obra_social&dni=eq.${encodeURIComponent(dni)}&limit=5`
         ).catch(() => []);
 
-        const personas = await supaFetch(`/personas?select=telefono,nombre,obra_social&dni=eq.${encodeURIComponent(dni)}&limit=5`).catch(() => []);
-
-        const telefonos = new Set();
         const personasInfo = { telefono: '', fullName: '', obraSocial: '' };
+        const telefonos = new Set();
+
         if (personas && personas.length) {
             const p0 = personas[0];
-            personasInfo.telefono = String(p0.telefono || '').replace(/\D/g, '');
             personasInfo.fullName = (p0.nombre || '').trim();
             personasInfo.obraSocial = p0.obra_social || '';
-
             personas.forEach(p => {
                 const raw = String(p.telefono || '').replace(/\D/g, '');
                 if (!raw) return;
@@ -764,91 +749,94 @@ async function buscarMisTurnos() {
                     telefonos.add('549' + raw);
                 }
             });
+            personasInfo.telefono = [...telefonos][0] || '';
         }
 
-        let turnosPorTel = [];
+        // 2. Buscar contactId en GHL por teléfono
+        let contactId = null;
         for (const tel of telefonos) {
-            const res = await supaFetch(
-                `/registros?select=*&numero=eq.${tel}&sede=eq.${sede}&order=fecha_turno.asc&limit=100`
-            ).catch(() => []);
-            if (res && res.length) turnosPorTel = [...turnosPorTel, ...res];
+            try {
+                const res = await ghlFetch(`contacts/search/duplicate?locationId=${GHL_LOC}&number=${encodeURIComponent(tel)}`);
+                if (res?.contact?.id) {
+                    contactId = res.contact.id;
+                    if (!personasInfo.fullName) {
+                        const c = res.contact;
+                        personasInfo.fullName = `${c.firstName || ''} ${c.lastName || ''}`.trim();
+                    }
+                    break;
+                }
+            } catch (_) {}
         }
 
-        let turnos = [...turnosPorDni, ...turnosPorTel];
-        const vistos = new Set();
-        turnos = turnos.filter(t => {
-            const key = t.id ? t.id.toString() : (t.event_id || JSON.stringify(t));
-            if (vistos.has(key)) return false;
-            vistos.add(key);
-            return true;
+        if (!contactId) {
+            container.innerHTML = '<div class="no-results">No encontramos tu información. Verificá que el DNI sea correcto o contactanos por WhatsApp.</div>';
+            return;
+        }
+
+        // 3. Obtener turnos del contacto en GHL
+        const apptRes = await ghlFetch(`contacts/${contactId}/appointments`);
+        const appointments = apptRes?.events || apptRes?.appointments || [];
+
+        // 4. Cargar mapa de profesionales: calendarId → { profesional, sede }
+        const allProfs = await supaFetch('/profesionales?select=profesional,sede,calendar_id').catch(() => []);
+        const calendarMap = {};
+        (allProfs || []).forEach(p => {
+            if (p.calendar_id) calendarMap[p.calendar_id] = { profesional: p.profesional, sede: p.sede };
         });
 
-        turnos = turnos.filter(t => {
-            const d = parsearFechaTurno(t.fecha_turno || t.fecha || '');
-            if (!d) return false;
-            return d >= hoyArg;
+        // 5. Filtrar: futuros, no eliminados, sede correcta
+        const ahora = new Date();
+        const hoyArg = new Date(ahora.toLocaleString('en-US', { timeZone: TZ }));
+        hoyArg.setHours(0, 0, 0, 0);
+
+        const filtered = appointments.filter(apt => {
+            if (apt.deleted) return false;
+            const profData = calendarMap[apt.calendarId];
+            if ((profData?.sede || '') !== sede) return false;
+            const startIso = ghlTimeToIso(apt.startTime);
+            const startDate = startIso ? new Date(startIso) : null;
+            return startDate && startDate >= hoyArg;
+        }).sort((a, b) => {
+            return new Date(ghlTimeToIso(a.startTime)) - new Date(ghlTimeToIso(b.startTime));
         });
 
-        if (!turnos.length) {
+        if (!filtered.length) {
             container.innerHTML = '<div class="no-results">No hay turnos próximos para este DNI en la sede seleccionada.</div>';
             return;
         }
 
-        // Resolución bulk de calendar_id — traer todos y filtrar client-side
-        const calendarMap = {}; // key: `${profesional.lower}||${sede.lower}` → calendar_id
-        const allProfs = await supaFetch('/profesionales?select=profesional,sede,calendar_id').catch(() => []);
-        (allProfs || []).forEach(p => {
-            const key = `${(p.profesional || '').trim().toLowerCase()}||${(p.sede || '').trim().toLowerCase()}`;
-            if (p.calendar_id) calendarMap[key] = p.calendar_id;
-        });
-
-        // Fallback por nombre base (sin sede) — sólo si match exacto profesional+sede falla
-        async function resolverCalendarId(profesional, sedeRow) {
-            const exact = calendarMap[`${profesional.trim().toLowerCase()}||${sedeRow.trim().toLowerCase()}`];
-            if (exact) return exact;
-            const base = profesional.split(' - ')[0].trim();
-            const candidatos = await supaFetch(
-                `/profesionales?select=profesional,sede,calendar_id&profesional=ilike.*${encodeURIComponent(base)}*&sede=eq.${encodeURIComponent(sedeRow)}&limit=1`
-            ).catch(() => []);
-            return candidatos.length ? candidatos[0].calendar_id : '';
-        }
-
-        const cards = await Promise.all(turnos.map(async t => {
-            const raw = t.fecha_turno || t.fecha || '';
-            const start = parsearFechaTurno(raw) || new Date();
-            const isoStart = start.toISOString();
+        // 6. Renderizar tarjetas
+        const cards = filtered.map(apt => {
+            const profData = calendarMap[apt.calendarId] || {};
+            const profesionalRow = profData.profesional || '';
+            const sedeRow = profData.sede || sede;
+            const isoStart = ghlTimeToIso(apt.startTime);
+            const start = new Date(isoStart);
             const fechaStr = start.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: TZ });
-            const horaStr = raw.includes('T') ? start.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ }) : (t.hora || '');
-            const eventId = t.event_id || t.eventId || t.id || '';
-            const rawStatus = (t.estado || t.status || 'agendado').toLowerCase();
-            const isCancelled = rawStatus === 'cancelado' || rawStatus === 'cancelled';
+            const horaStr = start.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+            const rawStatus = (apt.appointmentStatus || 'confirmed').toLowerCase();
+            const isCancelled = rawStatus === 'cancelled' || rawStatus === 'cancelado';
 
             const statusMap = {
-                agendado: { label: 'Confirmado', cls: 'status-confirmed' },
-                confirmado: { label: 'Confirmado', cls: 'status-confirmed' },
+                confirmed: { label: 'Confirmado', cls: 'status-confirmed' },
                 booked: { label: 'Confirmado', cls: 'status-confirmed' },
-                cancelado: { label: 'Cancelado', cls: 'status-cancelled' },
                 cancelled: { label: 'Cancelado', cls: 'status-cancelled' },
-                pendiente: { label: 'Pendiente', cls: 'status-pending' }
+                showed: { label: 'Atendido', cls: 'status-confirmed' },
+                noshow: { label: 'No asistió', cls: 'status-cancelled' },
             };
             const st = statusMap[rawStatus] || { label: rawStatus, cls: 'status-pending' };
 
-            const sedeRow = (t.sede || sede || '').trim();
-            const profesionalRow = (t.profesional || '').trim();
-            const calendarId = (!isCancelled && profesionalRow) ? await resolverCalendarId(profesionalRow, sedeRow) : '';
-
-            const tratamiento = t.tratamiento || t.motivo || '';
+            const tratamiento = apt.title || '';
             const calendarName = `${profesionalRow}${sedeRow ? ' - ' + sedeRow : ''}`;
-            const phone = personasInfo.telefono || String(t.numero || '').replace(/\D/g, '');
-            const fullName = personasInfo.fullName || t.nombre || '';
-            const obraSocial = personasInfo.obraSocial || t.obra_social || '';
+            const phone = personasInfo.telefono || '';
+            const fullName = personasInfo.fullName || '';
 
-            const actionsHtml = (!isCancelled && eventId) ? `
+            const actionsHtml = (!isCancelled && apt.id) ? `
                 <div class="turno-actions">
                     <button class="btn-reagendar"
                             data-action="reschedule"
-                            data-event-id="${escapeHtml(eventId)}"
-                            data-calendar-id="${escapeHtml(calendarId)}"
+                            data-event-id="${escapeHtml(apt.id)}"
+                            data-calendar-id="${escapeHtml(apt.calendarId)}"
                             data-current-iso="${escapeHtml(isoStart)}"
                             data-profesional="${escapeHtml(profesionalRow)}"
                             data-sede="${escapeHtml(sedeRow)}"
@@ -857,11 +845,10 @@ async function buscarMisTurnos() {
                             data-dni="${escapeHtml(dni)}"
                             data-full-name="${escapeHtml(fullName)}"
                             data-phone="${escapeHtml(phone)}"
-                            data-obra-social="${escapeHtml(obraSocial)}"
-                            ${calendarId ? '' : 'disabled title="No se pudo identificar el calendario. Contactanos por WhatsApp."'}>Reagendar</button>
+                            data-obra-social="${escapeHtml(personasInfo.obraSocial)}">Reagendar</button>
                     <button class="btn-cancelar"
                             data-action="cancel"
-                            data-event-id="${escapeHtml(eventId)}"
+                            data-event-id="${escapeHtml(apt.id)}"
                             data-tratamiento="${escapeHtml(tratamiento)}"
                             data-fecha="${escapeHtml(fechaStr)}${horaStr ? ' a las ' + escapeHtml(horaStr) : ''}"
                             data-dni="${escapeHtml(dni)}"
@@ -877,7 +864,7 @@ async function buscarMisTurnos() {
                         ${horaStr ? `<span class="turno-hora">${escapeHtml(horaStr)}</span>` : ''}
                     </div>
                     <div class="turno-info">
-                        <div><div class="turno-info-label">Paciente</div><div>${escapeHtml(t.nombre || 'N/A')}</div></div>
+                        <div><div class="turno-info-label">Paciente</div><div>${escapeHtml(fullName || 'N/A')}</div></div>
                         <div><div class="turno-info-label">Profesional</div><div>${escapeHtml(profesionalRow || 'N/A')}</div></div>
                         <div><div class="turno-info-label">Sede</div><div>${escapeHtml(sedeRow || sede)}</div></div>
                         <div><div class="turno-info-label">Tratamiento</div><div>${escapeHtml(tratamiento || 'N/A')}</div></div>
@@ -885,7 +872,7 @@ async function buscarMisTurnos() {
                     </div>
                     ${actionsHtml}
                 </div>`;
-        }));
+        });
 
         container.innerHTML = cards.join('');
     } catch (e) {
