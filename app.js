@@ -1008,7 +1008,7 @@ async function abrirReagendamiento(d) {
 
     try {
         const now = Date.now();
-        const end = now + 60 * 24 * 60 * 60 * 1000;
+        const end = now + 30 * 24 * 60 * 60 * 1000;
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
         // Fetch en paralelo: detalle del calendario (slotDuration) + free-slots
@@ -1196,7 +1196,7 @@ async function confirmarReagendamiento() {
             // Recargar slots
             try {
                 const now = Date.now();
-                const end = now + 60 * 24 * 60 * 60 * 1000;
+                const end = now + 30 * 24 * 60 * 60 * 1000;
                 const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 const slotsData = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
                 _rescheduleSlotsMap = slotsData?.slots || slotsData?.data || slotsData || {};
