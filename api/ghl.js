@@ -1,17 +1,41 @@
 const fetch = require('node-fetch');
 const { isAllowed } = require('./_lib/ghlAllowlist');
+const { isRateLimited, getClientIp } = require('./_lib/rateLimit');
 
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
+const GHL_LOCATION_ID = (process.env.GHL_LOCATION_ID || '').trim();
+
+// Validate that the request comes from the expected origin (server-side enforcement)
+function isOriginAllowed(req) {
+    const origin = (req.headers['origin'] || '').trim();
+    const referer = (req.headers['referer'] || '').trim();
+    if (origin && origin === ALLOWED_ORIGIN) return true;
+    if (referer && referer.startsWith(ALLOWED_ORIGIN)) return true;
+    return false;
+}
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST,PUT,PATCH');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+    res.setHeader('Vary', 'Origin');
 
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
+    }
+
+    // Server-side origin check — CORS alone is browser-only enforcement
+    if (!isOriginAllowed(req)) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Rate limit: 60 req/min per IP on the GHL proxy
+    const ip = getClientIp(req);
+    if (isRateLimited(ip, 60, 'ghl')) {
+        res.setHeader('Retry-After', '60');
+        return res.status(429).json({ error: 'Demasiadas solicitudes. Intentá de nuevo en un minuto.' });
     }
 
     const GHL_API_KEY = (process.env.GHL_API_KEY || '').trim();
@@ -32,8 +56,14 @@ module.exports = async (req, res) => {
 
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(req.query)) {
-        if (key !== 'path') queryParams.append(key, value);
+        if (key === 'path') continue;
+        // Override locationId with server-side env var to prevent targeting other GHL locations
+        if (key === 'locationId' && GHL_LOCATION_ID) continue;
+        queryParams.append(key, value);
     }
+    // Enforce server-side locationId on all GHL requests
+    if (GHL_LOCATION_ID) queryParams.set('locationId', GHL_LOCATION_ID);
+
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
     const ghlUrl = `https://services.leadconnectorhq.com/${targetPath}${queryString}`;
 

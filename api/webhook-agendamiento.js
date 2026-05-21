@@ -21,7 +21,7 @@ module.exports = async (req, res) => {
     }
 
     const ip = getClientIp(req);
-    if (isRateLimited(ip)) {
+    if (isRateLimited(ip, 10, 'webhook')) {
         res.setHeader('Retry-After', '60');
         return res.status(429).json({ error: 'Demasiadas solicitudes. Intentá de nuevo en un minuto.' });
     }

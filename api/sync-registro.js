@@ -1,5 +1,6 @@
 const { notifyN8n } = require('./_lib/notifyN8n');
 const { updateRegistroFecha, cancelarRegistro } = require('./_lib/supabaseAdmin');
+const { isRateLimited, getClientIp } = require('./_lib/rateLimit');
 
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
 
@@ -32,6 +33,7 @@ module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Vary', 'Origin');
 
     if (req.method === 'OPTIONS') {
         res.status(200).end();
@@ -40,6 +42,12 @@ module.exports = async (req, res) => {
 
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método no permitido' });
+    }
+
+    const ip = getClientIp(req);
+    if (isRateLimited(ip, 20, 'sync')) {
+        res.setHeader('Retry-After', '60');
+        return res.status(429).json({ error: 'Demasiadas solicitudes. Intentá de nuevo en un minuto.' });
     }
 
     const body = req.body || {};
