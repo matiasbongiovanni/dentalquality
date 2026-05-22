@@ -26,11 +26,15 @@ function validate(body) {
     return errors.length ? { ok: false, errors } : { ok: true };
 }
 
+const DEV_ORIGINS = ['https://dentalquality.vercel.app', 'http://localhost:3000', 'http://localhost:5500'];
+
 function isOriginAllowed(req) {
     const origin = (req.headers['origin'] || '').trim();
     const referer = (req.headers['referer'] || '').trim();
     if (origin && origin === ALLOWED_ORIGIN) return true;
     if (referer && referer.startsWith(ALLOWED_ORIGIN)) return true;
+    if (DEV_ORIGINS.some(o => origin === o || referer.startsWith(o))) return true;
+    if (!origin && !referer) return true;
     return false;
 }
 

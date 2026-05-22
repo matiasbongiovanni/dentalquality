@@ -1,4 +1,5 @@
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
+const DEV_ORIGINS = ['https://dentalquality.vercel.app', 'http://localhost:3000', 'http://localhost:5500'];
 
 // Server-side origin check — complements browser CORS enforcement
 function isOriginAllowed(req) {
@@ -6,6 +7,9 @@ function isOriginAllowed(req) {
     const referer = (req.headers['referer'] || '').trim();
     if (origin && origin === ALLOWED_ORIGIN) return true;
     if (referer && referer.startsWith(ALLOWED_ORIGIN)) return true;
+    if (DEV_ORIGINS.some(o => origin === o || referer.startsWith(o))) return true;
+    // Same-origin requests (no Origin/Referer header from same Vercel deployment)
+    if (!origin && !referer) return true;
     return false;
 }
 

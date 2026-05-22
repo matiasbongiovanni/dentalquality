@@ -65,16 +65,17 @@ module.exports = async (req, res) => {
     }
 
     const queryParams = new URLSearchParams();
-    const REQUIRE_LOCATION_IN_QUERY = (process.env.GHL_REQUIRE_LOCATION_IN_QUERY || 'false').trim() === 'true';
+    // contacts/search/duplicate requires locationId in query; free-slots rejects it
+    const needsLocationInQuery = GHL_LOCATION_ID && /^contacts\/search\/duplicate/.test(targetPath);
+    // contacts and appointments POST/PUT need locationId in body
+    const needsLocationInBody = GHL_LOCATION_ID && /^(contacts\/?|calendars\/events\/appointments)/.test(targetPath);
 
     for (const [key, value] of Object.entries(req.query)) {
         if (key === 'path') continue;
-        // Override locationId with server-side env var only if required
-        if (key === 'locationId' && GHL_LOCATION_ID && REQUIRE_LOCATION_IN_QUERY) continue;
+        if (key === 'locationId') continue; // always use server-side value
         queryParams.append(key, value);
     }
-    // Only enforce server-side locationId if explicitly required (agency tokens, not sub-account)
-    if (GHL_LOCATION_ID && REQUIRE_LOCATION_IN_QUERY) queryParams.set('locationId', GHL_LOCATION_ID);
+    if (needsLocationInQuery) queryParams.set('locationId', GHL_LOCATION_ID);
 
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
     const ghlUrl = `https://services.leadconnectorhq.com/${targetPath}${queryString}`;
@@ -90,7 +91,11 @@ module.exports = async (req, res) => {
 
     if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
         fetchOptions.headers['Content-Type'] = 'application/json';
-        fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+        let bodyObj = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+        if (needsLocationInBody && bodyObj && typeof bodyObj === 'object' && !Array.isArray(bodyObj)) {
+            bodyObj = { ...bodyObj, locationId: GHL_LOCATION_ID };
+        }
+        fetchOptions.body = JSON.stringify(bodyObj);
     }
 
     try {

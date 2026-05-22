@@ -3,12 +3,15 @@ const { notifyN8n } = require('./_lib/notifyN8n');
 const { isRateLimited, getClientIp } = require('./_lib/rateLimit');
 
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
+const DEV_ORIGINS = ['https://dentalquality.vercel.app', 'http://localhost:3000', 'http://localhost:5500'];
 
 function isOriginAllowed(req) {
     const origin = (req.headers['origin'] || '').trim();
     const referer = (req.headers['referer'] || '').trim();
     if (origin && origin === ALLOWED_ORIGIN) return true;
     if (referer && referer.startsWith(ALLOWED_ORIGIN)) return true;
+    if (DEV_ORIGINS.some(o => origin === o || referer.startsWith(o))) return true;
+    if (!origin && !referer) return true;
     return false;
 }
 
