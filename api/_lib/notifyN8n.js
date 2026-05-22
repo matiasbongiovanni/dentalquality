@@ -11,10 +11,6 @@ async function notifyN8n(payload, sourceTag) {
 
     const secret = (process.env.N8N_WEBHOOK_SECRET || '').trim();
     if (!secret) {
-        if (process.env.NODE_ENV === 'production') {
-            console.error('[notifyN8n] CRÍTICO: N8N_WEBHOOK_SECRET no configurada en producción. Webhook bloqueado.');
-            return { ok: false, skipped: true, reason: 'N8N_WEBHOOK_SECRET requerida en producción' };
-        }
         console.warn('[notifyN8n] ADVERTENCIA: N8N_WEBHOOK_SECRET no configurada. Los webhooks no están firmados.');
     }
 
