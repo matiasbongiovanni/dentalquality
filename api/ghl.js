@@ -3,14 +3,21 @@ const { isAllowed } = require('./_lib/ghlAllowlist');
 const { isRateLimited, getClientIp } = require('./_lib/rateLimit');
 
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
+const DEV_ORIGINS = ['https://dentalquality.vercel.app', 'http://localhost:3000', 'http://localhost:5500'];
 const GHL_LOCATION_ID = (process.env.GHL_LOCATION_ID || '').trim();
 
 // Validate that the request comes from the expected origin (server-side enforcement)
 function isOriginAllowed(req) {
     const origin = (req.headers['origin'] || '').trim();
     const referer = (req.headers['referer'] || '').trim();
+
+    // Check prod origin
     if (origin && origin === ALLOWED_ORIGIN) return true;
     if (referer && referer.startsWith(ALLOWED_ORIGIN)) return true;
+
+    // Check dev origins
+    if (DEV_ORIGINS.some(devOrigin => origin === devOrigin || referer?.startsWith(devOrigin))) return true;
+
     return false;
 }
 
