@@ -268,7 +268,12 @@ async function ghlFetch(path, opts = {}) {
         headers: { ...opts.headers, 'Content-Type': 'application/json' }
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.message || json.msg || `GHL Error ${res.status}`);
+    if (!res.ok) {
+        const msg = Array.isArray(json.message)
+            ? json.message.join(', ')
+            : (json.message || json.msg || json.error);
+        throw new Error(msg || `GHL Error ${res.status}`);
+    }
     return json;
 }
 
@@ -645,7 +650,7 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         // 1. Buscar o crear contacto en GHL
         let contactId;
         try {
-            const search = await ghlFetch(`contacts/search/duplicate?locationId=${GHL_LOC}&number=${encodeURIComponent(telefono)}`);
+            const search = await ghlFetch(`contacts/search/duplicate?number=${encodeURIComponent(telefono)}`);
             contactId = search?.contact?.id;
         } catch (_) { /* no encontrado */ }
 
@@ -794,7 +799,7 @@ async function buscarMisTurnos() {
         let contactId = null;
         for (const tel of telefonos) {
             try {
-                const res = await ghlFetch(`contacts/search/duplicate?locationId=${GHL_LOC}&number=${encodeURIComponent(tel)}`);
+                const res = await ghlFetch(`contacts/search/duplicate?number=${encodeURIComponent(tel)}`);
                 if (res?.contact?.id) {
                     contactId = res.contact.id;
                     if (!personasInfo.fullName) {
