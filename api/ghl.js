@@ -4,28 +4,6 @@ const { isRateLimited, getClientIp } = require('./_lib/rateLimit');
 
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
 const GHL_LOCATION_ID = (process.env.GHL_LOCATION_ID || '').trim();
-/** Si el PIT se creó dentro de la sub-cuenta, el token ya está scoped: no mandar locationId (evita 403). */
-const GHL_REQUIRE_LOCATION_IN_BODY = process.env.GHL_REQUIRE_LOCATION_IN_BODY === 'true';
-const GHL_REQUIRE_LOCATION_IN_QUERY = process.env.GHL_REQUIRE_LOCATION_IN_QUERY === 'true';
-
-/** POST: locationId va en el body (GHL rechaza si también está en query) */
-const LOCATION_IN_BODY = [
-    /^contacts\/?$/,
-    /^calendars\/events\/appointments\/?$/,
-];
-
-/** GET: locationId va en query string */
-const LOCATION_IN_QUERY = [
-    /^contacts\/search\/duplicate$/,
-];
-
-function normalizePath(path) {
-    return String(path || '').replace(/^\/+/, '');
-}
-
-function matchesAny(patterns, path) {
-    return patterns.some((rx) => rx.test(path));
-}
 
 // Validate that the request comes from the expected origin (server-side enforcement)
 function isOriginAllowed(req) {
@@ -79,24 +57,15 @@ module.exports = async (req, res) => {
         return res.status(403).json({ error: 'Path no permitido' });
     }
 
-    const normalizedPath = normalizePath(targetPath);
-    const method = (req.method || 'GET').toUpperCase();
-
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(req.query)) {
         if (key === 'path') continue;
-        // locationId en query solo lo define el servidor (evita suplantación)
+        // Override locationId with server-side env var to prevent targeting other GHL locations
         if (key === 'locationId' && GHL_LOCATION_ID) continue;
         queryParams.append(key, value);
     }
-    if (
-        GHL_REQUIRE_LOCATION_IN_QUERY &&
-        GHL_LOCATION_ID &&
-        method === 'GET' &&
-        matchesAny(LOCATION_IN_QUERY, normalizedPath)
-    ) {
-        queryParams.set('locationId', GHL_LOCATION_ID);
-    }
+    // Enforce server-side locationId on all GHL requests
+    if (GHL_LOCATION_ID) queryParams.set('locationId', GHL_LOCATION_ID);
 
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
     const ghlUrl = `https://services.leadconnectorhq.com/${targetPath}${queryString}`;
@@ -110,23 +79,9 @@ module.exports = async (req, res) => {
         }
     };
 
-    if (['POST', 'PUT', 'PATCH'].includes(method) && req.body) {
+    if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
         fetchOptions.headers['Content-Type'] = 'application/json';
-        let payload = req.body;
-        if (typeof payload === 'string') {
-            try { payload = JSON.parse(payload); } catch (_) { /* passthrough */ }
-        }
-        const injectLocationInBody =
-            GHL_REQUIRE_LOCATION_IN_BODY &&
-            GHL_LOCATION_ID &&
-            method === 'POST' &&
-            matchesAny(LOCATION_IN_BODY, normalizedPath);
-
-        if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-            const { locationId: _clientLoc, ...rest } = payload;
-            payload = injectLocationInBody ? { ...rest, locationId: GHL_LOCATION_ID } : rest;
-        }
-        fetchOptions.body = typeof payload === 'string' ? payload : JSON.stringify(payload);
+        fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     }
 
     try {
