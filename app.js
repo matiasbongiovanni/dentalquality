@@ -3,7 +3,6 @@
 // =============================================
 let SUPABASE_URL = '';
 let SUPABASE_HEADERS = {};
-const GHL_LOC = 'fotG33HIQ58UyWeEbpx9';
 const TZ = 'America/Argentina/Buenos_Aires';
 
 async function initConfig() {
