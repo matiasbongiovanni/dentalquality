@@ -1,17 +1,18 @@
 /* Modern Reset & Variables */
 :root {
-    /* Brand Palette */
-    --brand-blue: #1e3a8a;
-    --brand-teal: #00bfa5;
+    /* MGV Dental — paleta del logo */
+    --brand-blue: #1c3d7d;
+    --brand-cyan: #5bc2e7;
+    --brand-teal: var(--brand-cyan);
 
     --primary: var(--brand-blue);
-    --primary-dark: #172554;
-    --primary-light: #eff6ff;
-    --primary-bg: #dbeafe;
+    --primary-dark: #152f5f;
+    --primary-light: #e8f4fa;
+    --primary-bg: #d4eaf5;
 
-    --secondary: var(--brand-teal);
-    --secondary-light: #e0f2f1;
-    --secondary-dark: #00897b;
+    --secondary: var(--brand-cyan);
+    --secondary-light: #e8f6fc;
+    --secondary-dark: #3aa8d4;
 
     --text-main: #1e293b;
     --text-secondary: #64748b;
@@ -46,7 +47,7 @@ html, body {
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: var(--bg-body);
     color: var(--text-main);
     line-height: 1.5;
@@ -99,12 +100,24 @@ h3 { margin-top: 0; font-weight: 700; }
     justify-content: center;
     gap: 1.5rem;
     margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 3px solid transparent;
+    border-image: linear-gradient(90deg, var(--brand-blue) 0%, var(--brand-cyan) 55%, var(--brand-cyan) 100%) 1;
+}
+
+.brand-logo-wrap {
+    flex-shrink: 0;
+    background: #000;
+    border-radius: var(--radius-lg);
+    padding: 0.5rem 0.75rem;
+    box-shadow: var(--shadow-md);
 }
 
 .brand-logo {
-    height: 80px;
+    height: 72px;
     width: auto;
     object-fit: contain;
+    display: block;
 }
 
 .brand-text {
@@ -114,18 +127,32 @@ h3 { margin-top: 0; font-weight: 700; }
 .brand-text h1 {
     text-align: left;
     font-size: 2.5rem;
-    color: var(--brand-blue);
+    font-weight: 800;
     margin-bottom: 0.25rem;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+.brand-title-m {
+    color: var(--brand-blue);
+}
+
+.brand-title-gv {
+    color: var(--brand-cyan);
+}
+
+.brand-title-dental {
+    color: var(--brand-blue);
 }
 
 .brand-text .subtitle {
     text-align: left;
     margin-left: 0;
-    font-size: 1.1rem;
-    color: var(--brand-teal);
+    font-size: 1.05rem;
+    color: var(--brand-cyan);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
 }
 
 /* =============================================
@@ -248,7 +275,7 @@ h3 { margin-top: 0; font-weight: 700; }
 }
 
 .sede-btn:hover { border-color: var(--primary); color: var(--primary); }
-.sede-btn.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 6px -1px rgba(30, 58, 138, 0.2); }
+.sede-btn.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 6px -1px rgba(28, 61, 125, 0.25); }
 
 /* =============================================
    BOOKING MODE SELECTOR
@@ -298,7 +325,7 @@ h3 { margin-top: 0; font-weight: 700; }
     background: white;
     color: var(--primary);
     border-color: var(--primary);
-    box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.05);
+    box-shadow: 0 0 0 4px rgba(28, 61, 125, 0.08);
 }
 
 .mode-icon { flex-shrink: 0; }
@@ -335,13 +362,13 @@ h3 { margin-top: 0; font-weight: 700; }
 .esp-card:hover, .prof-card:hover {
     border-color: var(--secondary);
     transform: translateY(-4px);
-    box-shadow: 0 12px 20px -8px rgba(0, 191, 165, 0.15);
+    box-shadow: 0 12px 20px -8px rgba(91, 194, 231, 0.2);
 }
 
 .esp-card.selected, .prof-card.selected {
     border-color: var(--primary);
     background: var(--primary-light);
-    box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.1);
+    box-shadow: 0 0 0 4px rgba(28, 61, 125, 0.1);
 }
 
 .esp-card-icon {
@@ -447,7 +474,7 @@ h3 { margin-top: 0; font-weight: 700; }
 .form-input:focus, .form-select:focus {
     outline: none;
     border-color: var(--secondary);
-    box-shadow: 0 0 0 4px rgba(0, 191, 165, 0.15);
+    box-shadow: 0 0 0 4px rgba(91, 194, 231, 0.2);
     background-color: white;
 }
 
@@ -474,7 +501,7 @@ h3 { margin-top: 0; font-weight: 700; }
 
 .phone-wrapper:focus-within {
     border-color: var(--secondary);
-    box-shadow: 0 0 0 4px rgba(0, 191, 165, 0.15);
+    box-shadow: 0 0 0 4px rgba(91, 194, 231, 0.2);
 }
 
 .phone-prefix {
@@ -616,7 +643,7 @@ h3 { margin-top: 0; font-weight: 700; }
     background: var(--primary) !important;
     color: white !important;
     border-color: var(--primary) !important;
-    box-shadow: 0 8px 16px -4px rgba(30, 58, 138, 0.3);
+    box-shadow: 0 8px 16px -4px rgba(28, 61, 125, 0.3);
 }
 
 .date-card.is-current-day { box-shadow: 0 0 0 2px var(--primary-bg) inset; }
