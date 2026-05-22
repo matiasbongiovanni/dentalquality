@@ -653,7 +653,6 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
             const created = await ghlFetch('contacts/', {
                 method: 'POST',
                 body: JSON.stringify({
-                    locationId: GHL_LOC,
                     firstName: nombre,
                     lastName: apellido,
                     phone: telefono,
@@ -674,7 +673,6 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
             method: 'POST',
             body: JSON.stringify({
                 calendarId: slotSeleccionado.calendarId,
-                locationId: GHL_LOC,
                 contactId,
                 startTime,
                 title: `${nombre} ${apellido}${obraSocial ? ' - ' + obraSocial : ''} - ${tratamiento}`,

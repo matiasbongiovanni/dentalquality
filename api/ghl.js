@@ -81,7 +81,15 @@ module.exports = async (req, res) => {
 
     if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
         fetchOptions.headers['Content-Type'] = 'application/json';
-        fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+        let payload = req.body;
+        if (typeof payload === 'string') {
+            try { payload = JSON.parse(payload); } catch (_) { /* passthrough */ }
+        }
+        if (payload && typeof payload === 'object' && !Array.isArray(payload) && 'locationId' in payload) {
+            const { locationId: _drop, ...rest } = payload;
+            payload = rest;
+        }
+        fetchOptions.body = typeof payload === 'string' ? payload : JSON.stringify(payload);
     }
 
     try {
