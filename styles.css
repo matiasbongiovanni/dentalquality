@@ -2,26 +2,23 @@
 :root {
     /* MGV Dental — sistema visual (PDF marca) */
     --brand-cream: #F7F5F0;
-    --brand-beige: #E3DED2;
     --brand-gray: #D1D7DC;
     --brand-blue: #173858;
     --brand-cyan: #5FA9DD;
-    --brand-teal: var(--brand-cyan);
 
     --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-body: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
     --primary: var(--brand-blue);
-    --primary-dark: #0f2844;
-    --primary-light: #e8f2f8;
-    --primary-bg: #d4e6f2;
+    --primary-dark: rgba(23, 56, 88, 0.88);
+    --primary-light: rgba(23, 56, 88, 0.08);
+    --primary-bg: rgba(95, 169, 221, 0.15);
 
     --secondary: var(--brand-cyan);
-    --secondary-light: #e8f4fb;
-    --secondary-dark: #4a94c4;
+    --secondary-light: rgba(95, 169, 221, 0.12);
 
-    --text-main: #173858;
-    --text-secondary: #5a6b7d;
+    --text-main: var(--brand-blue);
+    --text-secondary: rgba(23, 56, 88, 0.65);
     --bg-body: var(--brand-cream);
     --bg-page: var(--brand-cream);
     --bg-card: #ffffff;
@@ -88,7 +85,8 @@ h1 {
 h3 { margin-top: 0; font-weight: 700; }
 
 .subtitle {
-    color: var(--secondary-dark);
+    color: var(--brand-blue);
+    opacity: 0.75;
     font-size: 1rem;
     font-weight: 600;
     margin: 0;
@@ -108,19 +106,11 @@ h3 { margin-top: 0; font-weight: 700; }
     gap: 1.5rem;
     margin-bottom: 2rem;
     padding-bottom: 1.5rem;
-    border-bottom: 3px solid transparent;
-    border-image: linear-gradient(90deg, var(--brand-blue) 0%, var(--brand-cyan) 55%, var(--brand-cyan) 100%) 1;
-}
-
-.brand-logo-wrap {
-    flex-shrink: 0;
-    background: #000;
-    border-radius: var(--radius-lg);
-    padding: 0.5rem 0.75rem;
-    box-shadow: var(--shadow-md);
+    border-bottom: 2px solid var(--brand-gray);
 }
 
 .brand-logo {
+    flex-shrink: 0;
     height: 72px;
     width: auto;
     object-fit: contain;
@@ -136,21 +126,10 @@ h3 { margin-top: 0; font-weight: 700; }
     text-align: left;
     font-size: 2.5rem;
     font-weight: 800;
+    color: var(--brand-blue);
     margin-bottom: 0.25rem;
     letter-spacing: -0.02em;
     line-height: 1.1;
-}
-
-.brand-title-m {
-    color: var(--brand-blue);
-}
-
-.brand-title-gv {
-    color: var(--brand-cyan);
-}
-
-.brand-title-dental {
-    color: var(--brand-blue);
 }
 
 .brand-text .subtitle {
@@ -158,7 +137,8 @@ h3 { margin-top: 0; font-weight: 700; }
     text-align: left;
     margin-left: 0;
     font-size: 1.05rem;
-    color: var(--brand-cyan);
+    color: var(--brand-blue);
+    opacity: 0.7;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -175,7 +155,7 @@ h3 { margin-top: 0; font-weight: 700; }
     display: flex;
     justify-content: center;
     gap: 0.25rem;
-    background: var(--brand-beige);
+    background: rgba(209, 215, 220, 0.35);
     padding: 0.4rem;
     border-radius: var(--radius-lg);
 }
@@ -294,7 +274,7 @@ h3 { margin-top: 0; font-weight: 700; }
    ============================================= */
 .booking-mode-container {
     margin-bottom: 2.5rem;
-    background: var(--brand-beige);
+    background: rgba(247, 245, 240, 0.85);
     padding: 1.5rem;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-color);
@@ -396,7 +376,7 @@ h3 { margin-top: 0; font-weight: 700; }
     transition: all 0.2s;
 }
 
-.esp-card:hover .esp-card-icon { background: var(--secondary-light); color: var(--secondary-dark); }
+.esp-card:hover .esp-card-icon { background: var(--secondary-light); color: var(--brand-cyan); }
 .esp-card.selected .esp-card-icon { background: var(--primary); color: white; }
 
 .esp-card-name, .prof-card-name {
