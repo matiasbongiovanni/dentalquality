@@ -60,8 +60,10 @@ Copiar `.env.example` a `.env` (desarrollo) o configurar en Vercel dashboard (pr
 
 | Variable | Descripción |
 |---|---|
-| `GHL_API_KEY` | Private Integration Token de GoHighLevel |
-| `GHL_LOCATION_ID` | ID de la Location en GHL |
+| `GHL_API_KEY` | Private Integration Token de GoHighLevel (crearlo **dentro de la sub-cuenta** MGV) |
+| `GHL_LOCATION_ID` | ID de la Location en GHL (solo si el PIT es de **agencia**) |
+| `GHL_REQUIRE_LOCATION_IN_BODY` | `true` solo con PIT de agencia; `false` si el PIT es de sub-cuenta (default recomendado) |
+| `GHL_REQUIRE_LOCATION_IN_QUERY` | `true` solo si hace falta `locationId` en búsqueda de duplicados |
 | `SUPABASE_URL` | URL REST de Supabase self-hosted |
 | `SUPABASE_ANON_KEY` | Anon key de Supabase (pública, protegida por RLS) |
 | **`SUPABASE_SERVICE_ROLE_KEY`** | Service-role key. **Server-side only**. Requerida por `/api/sync-registro` para PATCH directo en `registros`. |

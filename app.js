@@ -269,10 +269,17 @@ async function ghlFetch(path, opts = {}) {
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-        const msg = Array.isArray(json.message)
+        const raw = Array.isArray(json.message)
             ? json.message.join(', ')
             : (json.message || json.msg || json.error);
-        throw new Error(msg || `GHL Error ${res.status}`);
+        const msg = String(raw || `GHL Error ${res.status}`);
+        if (/does not have access to this location/i.test(msg)) {
+            throw new Error(
+                'El token de GHL no tiene acceso a la sede configurada. ' +
+                'Generá el Private Integration Token dentro de la sub-cuenta MGV y actualizá GHL_API_KEY en Vercel.'
+            );
+        }
+        throw new Error(msg);
     }
     return json;
 }

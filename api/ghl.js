@@ -4,6 +4,9 @@ const { isRateLimited, getClientIp } = require('./_lib/rateLimit');
 
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
 const GHL_LOCATION_ID = (process.env.GHL_LOCATION_ID || '').trim();
+/** Si el PIT se creó dentro de la sub-cuenta, el token ya está scoped: no mandar locationId (evita 403). */
+const GHL_REQUIRE_LOCATION_IN_BODY = process.env.GHL_REQUIRE_LOCATION_IN_BODY === 'true';
+const GHL_REQUIRE_LOCATION_IN_QUERY = process.env.GHL_REQUIRE_LOCATION_IN_QUERY === 'true';
 
 /** POST: locationId va en el body (GHL rechaza si también está en query) */
 const LOCATION_IN_BODY = [
@@ -87,6 +90,7 @@ module.exports = async (req, res) => {
         queryParams.append(key, value);
     }
     if (
+        GHL_REQUIRE_LOCATION_IN_QUERY &&
         GHL_LOCATION_ID &&
         method === 'GET' &&
         matchesAny(LOCATION_IN_QUERY, normalizedPath)
@@ -113,17 +117,14 @@ module.exports = async (req, res) => {
             try { payload = JSON.parse(payload); } catch (_) { /* passthrough */ }
         }
         const injectLocationInBody =
+            GHL_REQUIRE_LOCATION_IN_BODY &&
             GHL_LOCATION_ID &&
             method === 'POST' &&
             matchesAny(LOCATION_IN_BODY, normalizedPath);
 
         if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
             const { locationId: _clientLoc, ...rest } = payload;
-            if (injectLocationInBody) {
-                payload = { ...rest, locationId: GHL_LOCATION_ID };
-            } else {
-                payload = rest;
-            }
+            payload = injectLocationInBody ? { ...rest, locationId: GHL_LOCATION_ID } : rest;
         }
         fetchOptions.body = typeof payload === 'string' ? payload : JSON.stringify(payload);
     }
