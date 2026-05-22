@@ -9,13 +9,12 @@
     <meta property="og:description" content="Autogestión de turnos dentales online. Elegí tu especialidad y horario.">
     <meta property="og:type" content="website">
     <link rel="icon" href="logodental.png" type="image/png">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
 
-        <!-- Header -->
         <div class="header-brand">
             <img src="logodental.png" alt="MGV Dental" class="brand-logo"
                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
@@ -31,7 +30,6 @@
             </div>
         </div>
 
-        <!-- Tabs -->
         <div class="tabs-container">
             <div class="nav-buttons-container">
                 <button class="nav-button active" data-tab="agendar" onclick="selectTab('agendar')">Agendar</button>
@@ -39,13 +37,11 @@
             </div>
         </div>
 
-        <!-- Tab: Agendar -->
         <div id="tab-agendar" class="tab-content active">
 
             <h2 class="section-title">Agendar Cita</h2>
-            <p class="subtitle-sm" style="text-align:center;margin-bottom:1.5rem;">Seleccioná la sede y elegí cómo querés agendar tu cita.</p>
+            <p class="subtitle-sm" style="text-align:center; margin-bottom:1.5rem;">Seleccioná la sede y elegí cómo querés agendar tu cita.</p>
 
-            <!-- Sede dropdown -->
             <div class="form-group" style="margin-bottom:2rem;">
                 <select id="sedePicker" class="form-select" onchange="setSede(this.value)">
                     <option value="">Seleccioná una sede</option>
@@ -54,20 +50,19 @@
                 </select>
             </div>
 
-            <!-- Selector de modo (aparece al elegir sede) -->
             <div id="bookingModeSelector" style="display:none;">
                 <div class="booking-mode-container">
                     <p class="mode-label">¿Cómo querés agendar?</p>
                     <div class="mode-buttons-row">
                         <button class="mode-btn" data-mode="profesional" onclick="setBookingMode('profesional')">
                             <span class="mode-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5FA9DD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
                             </span>
                             Por profesional
                         </button>
                         <button class="mode-btn" data-mode="especialidad" onclick="setBookingMode('especialidad')">
                             <span class="mode-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C9 2 6 4.2 6 7c0 2 .5 3.6 1 5.6L8.2 20c.3 1.4 1 1.5 1.4 1.5s1-.4 1.2-1.5l.2-.8.2.8c.2 1.1.8 1.5 1.2 1.5s1.1-.1 1.4-1.5L15 12.6c.5-2 1-3.6 1-5.6C16 4.2 15 2 12 2z"/></svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5FA9DD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C9 2 6 4.2 6 7c0 2 .5 3.6 1 5.6L8.2 20c.3 1.4 1 1.5 1.4 1.5s1-.4 1.2-1.5l.2-.8.2.8c.2 1.1.8 1.5 1.2 1.5s1.1-.1 1.4-1.5L15 12.6c.5-2 1-3.6 1-5.6C16 4.2 15 2 12 2z"/></svg>
                             </span>
                             Por especialidad
                         </button>
@@ -75,21 +70,16 @@
                 </div>
             </div>
 
-            <!-- Especialidades grid -->
             <div id="espGridContainer" style="display:none;"></div>
-
-            <!-- Profesionales grid -->
             <div id="profGridContainer" style="display:none;"></div>
 
-            <!-- Formulario de agendamiento -->
             <div id="agendarFormContainer" style="display:none;">
                 <h2 class="section-title" style="margin-top:2rem;">Completá tus datos</h2>
 
                 <form id="agendarForm" class="form-grid">
-                    <!-- DNI -->
                     <div class="form-group full-width">
-                        <label class="form-label">DNI <span class="required">*</span></label>
-                        <div style="position:relative;width:100%;min-width:0;">
+                        <label class="form-label">DNI <span style="color:#ef4444;">*</span></label>
+                        <div style="position:relative; width:100%; min-width:0;">
                             <input
                                 type="text"
                                 id="dni"
@@ -100,23 +90,21 @@
                                 autocomplete="off"
                                 maxlength="8"
                             >
-                            <span id="dniLookupStatus" style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);font-size:0.82rem;color:var(--text-secondary);pointer-events:none;"></span>
+                            <span id="dniLookupStatus" style="position:absolute; right:0.75rem; top:50%; transform:translateY(-50%); font-size:0.82rem; color:rgba(23, 56, 88, 0.65); pointer-events:none;"></span>
                         </div>
                     </div>
 
-                    <!-- Nombre / Apellido -->
                     <div class="form-group">
-                        <label class="form-label">Nombre <span class="required">*</span></label>
+                        <label class="form-label">Nombre <span style="color:#ef4444;">*</span></label>
                         <input type="text" id="nombre" class="form-input" required placeholder="Tu nombre" autocomplete="given-name">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Apellido <span class="required">*</span></label>
+                        <label class="form-label">Apellido <span style="color:#ef4444;">*</span></label>
                         <input type="text" id="apellido" class="form-input" required placeholder="Tu apellido" autocomplete="family-name">
                     </div>
 
-                    <!-- Teléfono -->
                     <div class="form-group">
-                        <label class="form-label">Teléfono (WhatsApp) <span class="required">*</span></label>
+                        <label class="form-label">Teléfono (WhatsApp) <span style="color:#ef4444;">*</span></label>
                         <div class="phone-wrapper">
                             <span class="phone-prefix">+549</span>
                             <input
@@ -133,7 +121,6 @@
                         <span class="field-hint">10 dígitos sin el 0 ni el 15</span>
                     </div>
 
-                    <!-- Obra Social (select) -->
                     <div class="form-group">
                         <label class="form-label">Obra Social / Prepaga</label>
                         <select id="obraSocial" class="form-select">
@@ -143,28 +130,12 @@
                             <option value="Galeno">Galeno</option>
                             <option value="PAMI">PAMI</option>
                             <option value="IOMA">IOMA</option>
-                            <option value="APROSS">APROSS</option>
-                            <option value="OSECAC">OSECAC</option>
-                            <option value="OSPEDYC">OSPEDYC</option>
-                            <option value="AMFFA">AMFFA</option>
-                            <option value="OMINT">OMINT</option>
-                            <option value="Medifé">Medifé</option>
-                            <option value="Sancor Salud">Sancor Salud</option>
-                            <option value="Federada Salud">Federada Salud</option>
-                            <option value="Consolidar Salud">Consolidar Salud</option>
-                            <option value="Accord Salud">Accord Salud</option>
-                            <option value="Unión Personal">Unión Personal</option>
-                            <option value="OSFATUN">OSFATUN</option>
-                            <option value="UPCN">UPCN</option>
-                            <option value="OSPRERA">OSPRERA</option>
-                            <option value="Luis Pasteur">Luis Pasteur</option>
                             <option value="Otra">Otra</option>
                         </select>
                     </div>
 
-                    <!-- Tratamiento (required, filtrado por especialidad) -->
                     <div class="form-group full-width">
-                        <label class="form-label">Tratamiento <span class="required">*</span></label>
+                        <label class="form-label">Tratamiento <span style="color:#ef4444;">*</span></label>
                         <select id="tratamiento" class="form-select" required>
                             <option value="">Seleccioná primero una especialidad</option>
                         </select>
@@ -173,25 +144,25 @@
                     <h2 class="section-title full-width" style="margin-top:0.5rem;">Elegí el horario</h2>
 
                     <div class="form-group full-width">
-                        <label class="form-label">Días Disponibles <span class="required">*</span></label>
+                        <label class="form-label">Días Disponibles <span style="color:#ef4444;">*</span></label>
                         <div class="date-picker-wrapper">
                             <button type="button" class="scroll-btn" onclick="scrollDates('left')">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#173858" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                             </button>
                             <div id="datePickerContainer" class="date-picker-container">
-                                <p class="placeholder-text">Cargando agenda...</p>
+                                <p class="placeholder-text" style="color:rgba(23, 56, 88, 0.65);">Cargando agenda...</p>
                             </div>
                             <button type="button" class="scroll-btn" onclick="scrollDates('right')">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#173858" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                             </button>
                         </div>
                         <input type="hidden" id="appointmentDate" required>
                     </div>
 
                     <div class="form-group full-width">
-                        <label class="form-label">Horarios Disponibles <span class="required">*</span></label>
+                        <label class="form-label">Horarios Disponibles <span style="color:#ef4444;">*</span></label>
                         <div id="timeSlotsContainer" class="time-slots-grid">
-                            <p class="placeholder-text">Seleccioná una fecha para ver horarios.</p>
+                            <p class="placeholder-text" style="color:rgba(23, 56, 88, 0.65);">Seleccioná una fecha para ver horarios.</p>
                         </div>
                         <input type="hidden" id="appointmentTime" required>
                     </div>
@@ -204,12 +175,11 @@
             </div>
         </div>
 
-        <!-- Tab: Mis Turnos -->
         <div id="tab-misturnos" class="tab-content">
             <h2 class="section-title">Ver mis turnos</h2>
             <p class="subtitle-sm">Seleccioná tu sede e ingresá tu DNI para ver, reagendar o cancelar tus turnos.</p>
             <div class="form-group" style="margin-bottom:1rem;">
-                <label class="form-label">Sede <span class="required">*</span></label>
+                <label class="form-label">Sede <span style="color:#ef4444;">*</span></label>
                 <select id="consultaSede" class="form-select">
                     <option value="">Seleccioná una sede</option>
                     <option value="Lanus">Lanús</option>
@@ -225,112 +195,53 @@
                     inputmode="numeric"
                     maxlength="8"
                 >
-                <button class="save-button" style="width:auto;padding:0.75rem 2rem;" onclick="buscarMisTurnos()">Buscar</button>
+                <button class="save-button" style="width:auto; padding:0.75rem 2rem;" onclick="buscarMisTurnos()">Buscar</button>
             </div>
             <div id="resultadoTurnos"></div>
         </div>
     </div>
 
-    <!-- Modal Éxito -->
     <div id="successModal" class="modal-overlay">
-        <div class="modal-content" style="text-align:center;max-width:380px;">
-            <div class="success-icon">
+        <div class="modal-content" style="text-align:center; max-width:380px;">
+            <div class="success-icon" style="background:rgba(95, 169, 221, 0.15); color:#5FA9DD; width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1.5rem;">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
             </div>
             <h3>¡Turno agendado!</h3>
-            <p class="subtitle-sm">Te enviaremos los detalles a tu WhatsApp.</p>
+            <p class="subtitle-sm" style="color:rgba(23, 56, 88, 0.65);">Te enviaremos los detalles a tu WhatsApp.</p>
             <button class="save-button" onclick="cerrarModal('successModal')">Entendido</button>
         </div>
     </div>
 
-    <!-- Modal Reagendar -->
     <div id="rescheduleModal" class="modal-overlay">
         <div class="modal-content">
-            <button class="close-modal" onclick="cerrarModal('rescheduleModal')">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <button class="close-modal" onclick="cerrarModal('rescheduleModal')" style="position:absolute; top:1.25rem; right:1.25rem; background:none; border:none; cursor:pointer;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#173858" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
             <h3>Reagendar Turno</h3>
-            <div id="rescheduleCurrentInfo" class="reschedule-current"></div>
-            <input type="hidden" id="rescheduleAppointmentId">
-            <input type="hidden" id="rescheduleCalendarId">
-            <input type="hidden" id="rescheduleCurrentIso">
-            <input type="hidden" id="rescheduleSlotDuration" value="30">
-            <input type="hidden" id="rescheduleProfesional">
-            <input type="hidden" id="rescheduleSede">
-            <input type="hidden" id="rescheduleDni">
-            <input type="hidden" id="rescheduleFullName">
-            <input type="hidden" id="reschedulePhone">
-            <input type="hidden" id="rescheduleObraSocial">
-            <input type="hidden" id="rescheduleTratamiento">
-            <input type="hidden" id="rescheduleCalendarName">
-            <div class="form-group" style="margin-top:1rem;">
+            <div id="rescheduleCurrentInfo" class="reschedule-current" style="background:rgba(95, 169, 221, 0.15); color:#173858; padding:0.75rem 1rem; border-radius:0.5rem; font-size:0.9rem; margin-top:0.75rem;"></div>
+            
+            <div class="form-group" style="margin-top:1.5rem;">
                 <label class="form-label">Nueva Fecha</label>
                 <div class="date-picker-wrapper">
-                    <button type="button" class="scroll-btn" onclick="scrollRescheduleDates('left')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                    </button>
-                    <div id="rescheduleDatePicker" class="date-picker-container"></div>
-                    <button type="button" class="scroll-btn" onclick="scrollRescheduleDates('right')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    </button>
-                </div>
-                <input type="hidden" id="rescheduleDate">
+                    </div>
             </div>
-            <div class="form-group" style="margin-top:1rem;">
-                <label class="form-label">Nuevo Horario</label>
-                <div id="rescheduleTimeSlotsContainer" class="time-slots-grid">
-                    <p class="placeholder-text">Seleccioná una fecha.</p>
-                </div>
-                <input type="hidden" id="rescheduleTime">
-            </div>
+            
             <button class="save-button" style="margin-top:1.5rem;" id="confirmRescheduleBtn">Confirmar Reagendamiento</button>
             <div id="rescheduleStatus" class="status-msg"></div>
         </div>
     </div>
 
-    <!-- Modal Confirmar Cancelación -->
     <div id="confirmCancelModal" class="modal-overlay">
-        <div class="modal-content" style="text-align:center;max-width:400px;">
-            <div class="warning-icon">
+        <div class="modal-content" style="text-align:center; max-width:400px;">
+            <div class="warning-icon" style="background:#fee2e2; color:#ef4444; width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1.5rem;">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
             </div>
             <h3>¿Cancelar este turno?</h3>
-            <p class="subtitle-sm" id="confirmCancelInfo">Esta acción no se puede deshacer.</p>
-            <input type="hidden" id="cancelAppointmentId">
-            <input type="hidden" id="cancelDni">
-            <input type="hidden" id="cancelFullName">
-            <input type="hidden" id="cancelPhone">
-            <input type="hidden" id="cancelTratamiento">
-            <input type="hidden" id="cancelCalendarName">
-            <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
-                <button class="save-button" style="flex:1;background:#f1f5f9;color:var(--text-main);" onclick="cerrarModal('confirmCancelModal')">No, mantener</button>
-                <button class="save-button" style="flex:1;background:var(--danger);" id="confirmCancelBtn">Sí, cancelar</button>
+            <p class="subtitle-sm" id="confirmCancelInfo" style="color:rgba(23, 56, 88, 0.65);">Esta acción no se puede deshacer.</p>
+            <div style="display:flex; gap:0.75rem; margin-top:1.5rem;">
+                <button class="save-button" style="flex:1; background:#D1D7DC; color:#173858;" onclick="cerrarModal('confirmCancelModal')">No, mantener</button>
+                <button class="save-button" style="flex:1; background:#ef4444; color:white;" id="confirmCancelBtn">Sí, cancelar</button>
             </div>
-            <div id="confirmCancelStatus" class="status-msg"></div>
-        </div>
-    </div>
-
-    <!-- Modal Reagendamiento Éxito -->
-    <div id="rescheduleSuccessModal" class="modal-overlay">
-        <div class="modal-content" style="text-align:center;max-width:380px;">
-            <div class="success-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            </div>
-            <h3>¡Turno reagendado!</h3>
-            <p class="subtitle-sm" id="rescheduleSuccessInfo">Te enviaremos los detalles a tu WhatsApp.</p>
-            <button class="save-button" onclick="cerrarModal('rescheduleSuccessModal')">Entendido</button>
-        </div>
-    </div>
-
-    <!-- Modal Cancelación Éxito -->
-    <div id="cancelSuccessModal" class="modal-overlay">
-        <div class="modal-content" style="text-align:center;max-width:380px;">
-            <div class="success-icon" style="background:#fee2e2;color:var(--danger);">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </div>
-            <h3>Turno cancelado</h3>
-            <p class="subtitle-sm">Esperamos verte pronto.</p>
-            <button class="save-button" onclick="cerrarModal('cancelSuccessModal')">Entendido</button>
         </div>
     </div>
 
