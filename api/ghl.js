@@ -4,9 +4,9 @@ const { isRateLimited, getClientIp } = require('./_lib/rateLimit');
 
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
 const GHL_LOCATION_ID = (process.env.GHL_LOCATION_ID || '').trim();
-/** Si el PIT se creó dentro de la sub-cuenta, el token ya está scoped: no mandar locationId (evita 403). */
-const GHL_REQUIRE_LOCATION_IN_BODY = process.env.GHL_REQUIRE_LOCATION_IN_BODY === 'true';
-const GHL_REQUIRE_LOCATION_IN_QUERY = process.env.GHL_REQUIRE_LOCATION_IN_QUERY === 'true';
+/** Si el PIT se creó dentro de la sub-cuenta, el token ya está scoped: NO mandar locationId nunca (evita 403). */
+const GHL_REQUIRE_LOCATION_IN_BODY = false;
+const GHL_REQUIRE_LOCATION_IN_QUERY = false;
 
 /** POST: locationId va en el body (GHL rechaza si también está en query) */
 const LOCATION_IN_BODY = [
