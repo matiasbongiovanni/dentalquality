@@ -219,13 +219,44 @@
             </button>
             <h3>Reagendar Turno</h3>
             <div id="rescheduleCurrentInfo" class="reschedule-current" style="background:rgba(95, 169, 221, 0.15); color:#173858; padding:0.75rem 1rem; border-radius:0.5rem; font-size:0.9rem; margin-top:0.75rem;"></div>
-            
+
+            <input type="hidden" id="rescheduleAppointmentId">
+            <input type="hidden" id="rescheduleCalendarId">
+            <input type="hidden" id="rescheduleCurrentIso">
+            <input type="hidden" id="rescheduleProfesional">
+            <input type="hidden" id="rescheduleSede">
+            <input type="hidden" id="rescheduleFullName">
+            <input type="hidden" id="reschedulePhone">
+            <input type="hidden" id="rescheduleCalendarName">
+            <input type="hidden" id="rescheduleDni">
+            <input type="hidden" id="rescheduleObraSocial">
+            <input type="hidden" id="rescheduleTratamiento">
+            <input type="hidden" id="rescheduleSlotDuration" value="30">
+
             <div class="form-group" style="margin-top:1.5rem;">
                 <label class="form-label">Nueva Fecha</label>
                 <div class="date-picker-wrapper">
+                    <button type="button" class="scroll-btn" onclick="scrollRescheduleDates('left')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#173858" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <div id="rescheduleDatePicker" class="date-picker-container">
+                        <p class="placeholder-text">Cargando fechas...</p>
                     </div>
+                    <button type="button" class="scroll-btn" onclick="scrollRescheduleDates('right')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#173858" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                </div>
+                <input type="hidden" id="rescheduleDate">
             </div>
-            
+
+            <div class="form-group" style="margin-top:1rem;">
+                <label class="form-label">Horarios Disponibles</label>
+                <div id="rescheduleTimeSlotsContainer" class="time-slots-grid">
+                    <p class="placeholder-text">Seleccioná una fecha.</p>
+                </div>
+                <input type="hidden" id="rescheduleTime">
+            </div>
+
             <button class="save-button" style="margin-top:1.5rem;" id="confirmRescheduleBtn">Confirmar Reagendamiento</button>
             <div id="rescheduleStatus" class="status-msg"></div>
         </div>
@@ -238,10 +269,41 @@
             </div>
             <h3>¿Cancelar este turno?</h3>
             <p class="subtitle-sm" id="confirmCancelInfo" style="color:rgba(23, 56, 88, 0.65);">Esta acción no se puede deshacer.</p>
+
+            <input type="hidden" id="cancelAppointmentId">
+            <input type="hidden" id="cancelFullName">
+            <input type="hidden" id="cancelPhone">
+            <input type="hidden" id="cancelCalendarName">
+            <input type="hidden" id="cancelDni">
+            <input type="hidden" id="cancelTratamiento">
+
             <div style="display:flex; gap:0.75rem; margin-top:1.5rem;">
                 <button class="save-button" style="flex:1; background:#D1D7DC; color:#173858;" onclick="cerrarModal('confirmCancelModal')">No, mantener</button>
                 <button class="save-button" style="flex:1; background:#ef4444; color:white;" id="confirmCancelBtn">Sí, cancelar</button>
             </div>
+            <div id="confirmCancelStatus" class="status-msg"></div>
+        </div>
+    </div>
+
+    <div id="cancelSuccessModal" class="modal-overlay">
+        <div class="modal-content" style="text-align:center; max-width:380px;">
+            <div class="success-icon" style="background:rgba(95, 169, 221, 0.15); color:#5FA9DD; width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1.5rem;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <h3>¡Turno cancelado!</h3>
+            <p class="subtitle-sm" style="color:rgba(23, 56, 88, 0.65);">Se ha cancelado tu turno correctamente.</p>
+            <button class="save-button" onclick="cerrarModal('cancelSuccessModal'); selectTab('misturnos');">Entendido</button>
+        </div>
+    </div>
+
+    <div id="rescheduleSuccessModal" class="modal-overlay">
+        <div class="modal-content" style="text-align:center; max-width:380px;">
+            <div class="success-icon" style="background:rgba(95, 169, 221, 0.15); color:#5FA9DD; width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1.5rem;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <h3>¡Turno reagendado!</h3>
+            <p class="subtitle-sm" id="rescheduleSuccessInfo" style="color:rgba(23, 56, 88, 0.65);">Tu turno ha sido reprogramado correctamente.</p>
+            <button class="save-button" onclick="cerrarModal('rescheduleSuccessModal'); selectTab('misturnos');">Entendido</button>
         </div>
     </div>
 
