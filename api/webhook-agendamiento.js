@@ -4,6 +4,14 @@ const { isRateLimited, getClientIp } = require('./_lib/rateLimit');
 
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
 
+function isOriginAllowed(req) {
+    const origin = (req.headers['origin'] || '').trim();
+    const referer = (req.headers['referer'] || '').trim();
+    if (origin && origin === ALLOWED_ORIGIN) return true;
+    if (referer && referer.startsWith(ALLOWED_ORIGIN)) return true;
+    return false;
+}
+
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
@@ -18,6 +26,10 @@ module.exports = async (req, res) => {
 
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método no permitido' });
+    }
+
+    if (!isOriginAllowed(req)) {
+        return res.status(403).json({ error: 'Forbidden' });
     }
 
     const ip = getClientIp(req);

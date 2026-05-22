@@ -47,8 +47,11 @@ module.exports = async (req, res) => {
     if (!path) {
         return res.status(400).json({ error: 'Missing path parameter' });
     }
+    if (Array.isArray(path)) {
+        return res.status(400).json({ error: 'path parameter must be a single string' });
+    }
 
-    const targetPath = Array.isArray(path) ? path.join('/') : path;
+    const targetPath = path;
 
     if (!isAllowed(targetPath, req.method)) {
         return res.status(403).json({ error: 'Path no permitido' });

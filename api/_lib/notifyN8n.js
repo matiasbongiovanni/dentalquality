@@ -1,12 +1,21 @@
 const fetch = require('node-fetch');
 const crypto = require('crypto');
 
-const N8N_TIMEOUT_MS = 10000;
+const N8N_TIMEOUT_MS = 12000;
 
 async function notifyN8n(payload, sourceTag) {
     const url = (process.env.N8N_WEBHOOK_URL || '').trim();
     if (!url) {
         return { ok: false, skipped: true, reason: 'N8N_WEBHOOK_URL no configurada' };
+    }
+
+    const secret = (process.env.N8N_WEBHOOK_SECRET || '').trim();
+    if (!secret) {
+        if (process.env.NODE_ENV === 'production') {
+            console.error('[notifyN8n] CRÍTICO: N8N_WEBHOOK_SECRET no configurada en producción. Webhook bloqueado.');
+            return { ok: false, skipped: true, reason: 'N8N_WEBHOOK_SECRET requerida en producción' };
+        }
+        console.warn('[notifyN8n] ADVERTENCIA: N8N_WEBHOOK_SECRET no configurada. Los webhooks no están firmados.');
     }
 
     const finalPayload = {
@@ -18,7 +27,6 @@ async function notifyN8n(payload, sourceTag) {
     };
 
     const headers = { 'Content-Type': 'application/json' };
-    const secret = (process.env.N8N_WEBHOOK_SECRET || '').trim();
     if (secret) {
         const sig = crypto
             .createHmac('sha256', secret)

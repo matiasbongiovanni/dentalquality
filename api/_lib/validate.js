@@ -13,13 +13,15 @@ function validateAgendamiento(body) {
     }
 
     const phone = String(body.phone || '').replace(/[\s\-\+\(\)]/g, '');
-    if (!phone || !/^\d{8,15}$/.test(phone)) {
-        errors.push('phone: requerido, mínimo 8 dígitos');
+    if (!phone || !/^\d{10,15}$/.test(phone)) {
+        errors.push('phone: requerido, mínimo 10 dígitos (código área + número AR)');
     }
 
     const dni = String(body.DNI || '').replace(/\./g, '').trim();
     if (!dni || !/^\d{7,8}$/.test(dni)) {
         errors.push('DNI: requerido, 7 u 8 dígitos numéricos');
+    } else if (/^(\d)\1+$/.test(dni)) {
+        errors.push('DNI: valor inválido');
     }
 
     if (body['Obra Social'] !== undefined && typeof body['Obra Social'] !== 'string') {

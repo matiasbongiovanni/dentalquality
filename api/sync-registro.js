@@ -1,5 +1,5 @@
 const { notifyN8n } = require('./_lib/notifyN8n');
-const { updateRegistroFecha, cancelarRegistro } = require('./_lib/supabaseAdmin');
+const { updateRegistroFecha, cancelarRegistro, supaRequest } = require('./_lib/supabaseAdmin');
 const { isRateLimited, getClientIp } = require('./_lib/rateLimit');
 
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || 'https://agendamiento.dentalquality.com.ar').trim();
@@ -19,13 +19,19 @@ function validate(body) {
             errors.push('startTime: requerido (ISO 8601)');
         }
     }
-    if (body.DNI !== undefined) {
-        const dni = String(body.DNI).replace(/\./g, '').trim();
-        if (dni && !/^\d{7,8}$/.test(dni)) {
-            errors.push('DNI: 7 u 8 dígitos numéricos');
-        }
+    const dni = String(body.DNI || '').replace(/\./g, '').trim();
+    if (!dni || !/^\d{7,8}$/.test(dni)) {
+        errors.push('DNI: requerido, 7 u 8 dígitos numéricos');
     }
     return errors.length ? { ok: false, errors } : { ok: true };
+}
+
+function isOriginAllowed(req) {
+    const origin = (req.headers['origin'] || '').trim();
+    const referer = (req.headers['referer'] || '').trim();
+    if (origin && origin === ALLOWED_ORIGIN) return true;
+    if (referer && referer.startsWith(ALLOWED_ORIGIN)) return true;
+    return false;
 }
 
 module.exports = async (req, res) => {
@@ -44,6 +50,10 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Método no permitido' });
     }
 
+    if (!isOriginAllowed(req)) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const ip = getClientIp(req);
     if (isRateLimited(ip, 20, 'sync')) {
         res.setHeader('Retry-After', '60');
@@ -57,6 +67,18 @@ module.exports = async (req, res) => {
     }
 
     const { action, appointmentId, startTime } = body;
+    const normDni = String(body.DNI).replace(/\./g, '').trim();
+
+    // Verificación IDOR: DNI debe coincidir con el registro en Supabase
+    const regCheck = await supaRequest('GET', `/registros?id=eq.${encodeURIComponent(appointmentId)}&select=dni`);
+    if (!regCheck.ok || !Array.isArray(regCheck.data) || !regCheck.data[0]) {
+        return res.status(403).json({ error: 'No autorizado o turno no encontrado' });
+    }
+    const dniDb = String(regCheck.data[0].dni || '').replace(/\./g, '').trim();
+    if (dniDb !== normDni) {
+        return res.status(403).json({ error: 'No autorizado' });
+    }
+
     const sourceTag = action === 'reschedule' ? 'Web Reagendamiento' : 'Web Cancelacion';
 
     // 1. Sync Supabase con service-role (autoritativo)

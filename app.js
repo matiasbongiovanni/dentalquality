@@ -24,7 +24,7 @@ async function initConfig() {
 // =============================================
 let disponibilidadGlobal = {};
 let slotSeleccionado = null;
-let bookingMode = 'especialidad'; // 'especialidad' | 'profesional'
+let bookingMode = 'profesional';
 let profesionalesCache = []; // cache de profesionales de Supabase
 
 // =============================================
@@ -130,11 +130,39 @@ let sedeSeleccionada = '';
 
 function setSede(sede) {
     sedeSeleccionada = sede;
-    document.querySelectorAll('.sede-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector(`.sede-btn[data-sede="${sede}"]`)?.classList.add('active');
+    profesionalesCache = [];
+    especialidadSeleccionada = null;
+    bookingMode = null;
     resetBookingForm();
-    if (bookingMode === 'profesional' && profesionalesCache.length) {
-        poblarSelectProfesionales();
+
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+
+    const profContainer = document.getElementById('profGridContainer');
+    const espContainer = document.getElementById('espGridContainer');
+    if (profContainer) profContainer.style.display = 'none';
+    if (espContainer) espContainer.style.display = 'none';
+
+    const modeSelector = document.getElementById('bookingModeSelector');
+    if (modeSelector) modeSelector.style.display = sede ? 'block' : 'none';
+}
+
+function setBookingMode(mode) {
+    bookingMode = mode;
+    especialidadSeleccionada = null;
+    resetBookingForm();
+
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.mode-btn[data-mode="${mode}"]`)?.classList.add('active');
+
+    const profContainer = document.getElementById('profGridContainer');
+    const espContainer = document.getElementById('espGridContainer');
+
+    if (mode === 'profesional') {
+        if (espContainer) espContainer.style.display = 'none';
+        if (profContainer) { profContainer.style.display = 'block'; cargarProfesionalesSelect(); }
+    } else {
+        if (profContainer) profContainer.style.display = 'none';
+        if (espContainer) { espContainer.style.display = 'block'; renderEspecialidadCards(); }
     }
 }
 
@@ -182,31 +210,6 @@ function actualizarTratamientosPorNombre(nombre) {
         nombre.toLowerCase().includes(e.searchKey) || e.searchKey.includes(nombre.toLowerCase().slice(0, 5))
     );
     actualizarTratamientos(esp ? esp.tratamientos : ['Consulta general', 'Control / Revisación', 'Urgencia']);
-}
-
-// =============================================
-// MODO DE AGENDAMIENTO
-// =============================================
-function setBookingMode(mode) {
-    bookingMode = mode;
-
-    document.getElementById('btnModeEsp').classList.toggle('active', mode === 'especialidad');
-    document.getElementById('btnModeProf').classList.toggle('active', mode === 'profesional');
-
-    const step1Esp = document.getElementById('step1-especialidad');
-    const step1Prof = document.getElementById('step1-profesional');
-
-    if (mode === 'especialidad') {
-        step1Esp.style.display = '';
-        step1Prof.style.display = 'none';
-    } else {
-        step1Esp.style.display = 'none';
-        step1Prof.style.display = '';
-        cargarProfesionalesSelect();
-    }
-
-    // Resetear form
-    resetBookingForm();
 }
 
 function resetBookingForm() {
@@ -333,12 +336,16 @@ function poblarSelectProfesionales() {
             const card = document.createElement('div');
             card.className = 'prof-card';
             card.dataset.calendarId = prof.calendar_id;
-            const inicial = (prof.profesional || '?').replace(/^(Dr|Dra)\.?\s*/i, '').trim()[0] || '?';
-            card.innerHTML = `
-                <div class="prof-card-avatar">${inicial.toUpperCase()}</div>
-                <div class="prof-card-name">${prof.profesional}</div>
-                ${prof.sede ? `<span class="prof-card-badge">${prof.sede}</span>` : ''}
-            `;
+            const nameEl = document.createElement('div');
+            nameEl.className = 'prof-card-name';
+            nameEl.textContent = prof.profesional;
+            card.appendChild(nameEl);
+            if (prof.sede) {
+                const badge = document.createElement('span');
+                badge.className = 'prof-card-badge';
+                badge.textContent = `Sede: ${prof.sede}`;
+                card.appendChild(badge);
+            }
             card.onclick = () => {
                 document.querySelectorAll('.prof-card').forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
@@ -389,21 +396,30 @@ async function cargarSlotsEspecialidad(especialidad) {
         return;
     }
 
+    if (!sedeSeleccionada) {
+        formContainer.style.display = 'block';
+        formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">Primero seleccioná una sede (Lanús o Lomas).</p>';
+        return;
+    }
+
     formContainer.style.display = 'block';
     formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">Buscando turnos disponibles...</p>';
 
     try {
-        const profs = await supaFetch(`/profesionales?select=*&especialidades=ilike.*${encodeURIComponent(especialidad)}*`);
+        // Normalizar sede para comparación insensitive (acento + case)
+        const sedeNorm = sedeSeleccionada.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+        const profs = await supaFetch(`/profesionales?select=*&especialidades=ilike.*${encodeURIComponent(especialidad)}*&sede=ilike.*${encodeURIComponent(sedeNorm)}*`);
 
         if (!profs.length) {
-            dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">No hay profesionales para esta especialidad.</p>';
+            dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">No hay profesionales para esta especialidad en esta sede.</p>';
             return;
         }
 
         const now = Date.now();
         const end = now + 30 * 24 * 60 * 60 * 1000;
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const tz = TZ;
 
         const results = await Promise.all(profs.map(async prof => {
             try {
@@ -412,10 +428,16 @@ async function cargarSlotsEspecialidad(especialidad) {
             } catch { return []; }
         }));
 
-        poblarDisponibilidad(results.flat());
+        const allSlots = results.flat();
+        if (allSlots.length === 0) {
+            dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">Sin turnos disponibles en los próximos 30 días para esta especialidad. Probá con la otra sede o contactanos por WhatsApp.</p>';
+            return;
+        }
+
+        poblarDisponibilidad([allSlots]);
         dibujarTarjetasDeDias(dateContainer);
     } catch (e) {
-        dateContainer.innerHTML = `<p style="color:var(--danger);margin:auto;">Error: ${e.message}</p>`;
+        dateContainer.innerHTML = `<p style="color:var(--danger);margin:auto;">Error: ${escapeHtml(e.message)}</p>`;
     }
 }
 
@@ -432,6 +454,13 @@ async function cargarSlotsCalendar(calendarId) {
     document.getElementById('appointmentTime').value = '';
     document.getElementById('timeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha para ver horarios.</p>';
 
+    if (!sedeSeleccionada) {
+        formContainer.style.display = 'block';
+        formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">Primero seleccioná una sede (Lanús o Lomas).</p>';
+        return;
+    }
+
     formContainer.style.display = 'block';
     formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">Buscando turnos disponibles...</p>';
@@ -440,20 +469,29 @@ async function cargarSlotsCalendar(calendarId) {
         const prof = profesionalesCache.find(p => p.calendar_id === calendarId);
         const now = Date.now();
         const end = now + 30 * 24 * 60 * 60 * 1000;
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const tz = TZ;
 
         const raw = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
         const slots = parsearSlots(raw, prof || { calendar_id: calendarId, profesional: 'Profesional', sede: '' });
         poblarDisponibilidad([slots]);
         dibujarTarjetasDeDias(dateContainer);
     } catch (e) {
-        dateContainer.innerHTML = `<p style="color:var(--danger);margin:auto;">Error: ${e.message}</p>`;
+        dateContainer.innerHTML = `<p style="color:var(--danger);margin:auto;">Error: ${escapeHtml(e.message)}</p>`;
     }
 }
 
 // =============================================
 // HELPERS DE SLOTS
 // =============================================
+
+// GHL devuelve ISOs sin timezone ("2026-05-20T09:00:00") cuando se pide ART.
+// Sin offset, new Date() los interpreta como UTC → 3h de diferencia.
+// Normalizamos agregando -03:00 si no tienen timezone.
+function normalizarIsoArt(iso) {
+    if (!iso || /[Z+\-]\d{2}:\d{2}$/.test(iso) || iso.endsWith('Z')) return iso;
+    return iso + '-03:00';
+}
+
 function parsearSlots(raw, prof) {
     const slotsMap = raw?.slots || raw?.data || raw || {};
     const collected = [];
@@ -462,7 +500,8 @@ function parsearSlots(raw, prof) {
         const slots = dayData?.slots || dayData;
         if (!Array.isArray(slots)) return;
         slots.forEach(slot => {
-            const iso = typeof slot === 'string' ? slot : (slot.startTime || slot);
+            const isoRaw = typeof slot === 'string' ? slot : (slot.startTime || slot);
+            const iso = normalizarIsoArt(isoRaw);
             const d = new Date(iso);
             if (!isNaN(d.getTime()) && d > new Date()) {
                 collected.push({
@@ -542,11 +581,10 @@ function seleccionarFecha(dateStr, cardEl) {
         .sort((a, b) => a.d - b.d);
 
     parsed.forEach(slot => {
-        const hh = String(slot.d.getHours()).padStart(2, '0');
-        const mm = String(slot.d.getMinutes()).padStart(2, '0');
+        const tv = slot.d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ, hour12: false });
         const btn = document.createElement('div');
         btn.className = 'time-slot-btn';
-        btn.textContent = `${hh}:${mm}`;
+        btn.textContent = tv;
         btn.onclick = () => {
             container.querySelectorAll('.time-slot-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
@@ -678,8 +716,6 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         document.getElementById('successModal')?.classList.add('active');
         document.getElementById('agendarForm').reset();
         document.getElementById('agendarFormContainer').style.display = 'none';
-        document.getElementById('especialidadSelect').value = '';
-        document.getElementById('profesionalSelect').value = '';
         disponibilidadGlobal = {};
         slotSeleccionado = null;
     } catch (e) {
@@ -705,14 +741,18 @@ function escapeHtml(str) {
     }[c]));
 }
 
-// GHL devuelve fechas como "YYYY-MM-DD HH:mm:ss" en UTC
+// GHL devuelve fechas de turnos como "YYYY-MM-DD HH:mm:ss" en horario LOCAL (ART = UTC-3), sin timezone marker.
+// Agregar Z los trataba como UTC → mostraba 3h menos. Usar -03:00 para interpretarlos correctamente.
 function ghlTimeToIso(raw) {
     if (!raw) return null;
-    // "2026-05-29 15:45:00" → "2026-05-29T15:45:00Z"
-    return raw.replace(' ', 'T') + 'Z';
+    // "2026-06-05 13:00:00" (ART) → "2026-06-05T13:00:00-03:00"
+    return raw.replace(' ', 'T') + '-03:00';
 }
 
+let _buscandoTurnos = false;
 async function buscarMisTurnos() {
+    if (_buscandoTurnos) return;
+    _buscandoTurnos = true;
     const sede = document.getElementById('consultaSede').value;
     const dni = document.getElementById('consultaDNI').value.trim();
     const container = document.getElementById('resultadoTurnos');
@@ -877,6 +917,8 @@ async function buscarMisTurnos() {
         container.innerHTML = cards.join('');
     } catch (e) {
         container.innerHTML = `<div class="no-results" style="color:var(--danger);">Error: ${escapeHtml(e.message)}</div>`;
+    } finally {
+        _buscandoTurnos = false;
     }
 }
 
@@ -1009,7 +1051,7 @@ async function abrirReagendamiento(d) {
     try {
         const now = Date.now();
         const end = now + 30 * 24 * 60 * 60 * 1000;
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const tz = TZ;
 
         // Fetch en paralelo: detalle del calendario (slotDuration) + free-slots
         const [calInfo, slotsData] = await Promise.all([
@@ -1079,10 +1121,11 @@ function seleccionarFechaReagendar(dateStr, cardEl) {
     const seen = new Set();
     const parsed = [];
     slotsData.forEach(slot => {
-        const iso = typeof slot === 'string' ? slot : (slot.startTime || slot);
+        const isoRaw = typeof slot === 'string' ? slot : (slot.startTime || slot);
+        const iso = normalizarIsoArt(isoRaw);
         const d = new Date(iso);
         if (isNaN(d.getTime())) return;
-        const tv = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        const tv = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ, hour12: false });
         const key = iso;
         if (seen.has(key)) return;
         seen.add(key);
@@ -1197,7 +1240,7 @@ async function confirmarReagendamiento() {
             try {
                 const now = Date.now();
                 const end = now + 30 * 24 * 60 * 60 * 1000;
-                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const tz = TZ;
                 const slotsData = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
                 _rescheduleSlotsMap = slotsData?.slots || slotsData?.data || slotsData || {};
                 renderRescheduleDates(_rescheduleSlotsMap, currentIso);
@@ -1330,6 +1373,4 @@ if (telInput) {
 // =============================================
 // INIT
 // =============================================
-initConfig().then(() => {
-    renderEspecialidadCards();
-});
+initConfig();
