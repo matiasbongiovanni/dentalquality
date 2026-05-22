@@ -58,14 +58,16 @@ module.exports = async (req, res) => {
     }
 
     const queryParams = new URLSearchParams();
+    const REQUIRE_LOCATION_IN_QUERY = (process.env.GHL_REQUIRE_LOCATION_IN_QUERY || 'false').trim() === 'true';
+
     for (const [key, value] of Object.entries(req.query)) {
         if (key === 'path') continue;
-        // Override locationId with server-side env var to prevent targeting other GHL locations
-        if (key === 'locationId' && GHL_LOCATION_ID) continue;
+        // Override locationId with server-side env var only if required
+        if (key === 'locationId' && GHL_LOCATION_ID && REQUIRE_LOCATION_IN_QUERY) continue;
         queryParams.append(key, value);
     }
-    // Enforce server-side locationId on all GHL requests
-    if (GHL_LOCATION_ID) queryParams.set('locationId', GHL_LOCATION_ID);
+    // Only enforce server-side locationId if explicitly required (agency tokens, not sub-account)
+    if (GHL_LOCATION_ID && REQUIRE_LOCATION_IN_QUERY) queryParams.set('locationId', GHL_LOCATION_ID);
 
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
     const ghlUrl = `https://services.leadconnectorhq.com/${targetPath}${queryString}`;
