@@ -1,25 +1,31 @@
 /* Modern Reset & Variables */
 :root {
-    /* MGV Dental — paleta del logo */
-    --brand-blue: #1c3d7d;
-    --brand-cyan: #5bc2e7;
+    /* MGV Dental — sistema visual (PDF marca) */
+    --brand-cream: #F7F5F0;
+    --brand-beige: #E3DED2;
+    --brand-gray: #D1D7DC;
+    --brand-blue: #173858;
+    --brand-cyan: #5FA9DD;
     --brand-teal: var(--brand-cyan);
 
+    --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-body: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
     --primary: var(--brand-blue);
-    --primary-dark: #152f5f;
-    --primary-light: #e8f4fa;
-    --primary-bg: #d4eaf5;
+    --primary-dark: #0f2844;
+    --primary-light: #e8f2f8;
+    --primary-bg: #d4e6f2;
 
     --secondary: var(--brand-cyan);
-    --secondary-light: #e8f6fc;
-    --secondary-dark: #3aa8d4;
+    --secondary-light: #e8f4fb;
+    --secondary-dark: #4a94c4;
 
-    --text-main: #1e293b;
-    --text-secondary: #64748b;
-    --bg-body: #f8fafc;
-    --bg-page: #f8fafc; /* alias */
+    --text-main: #173858;
+    --text-secondary: #5a6b7d;
+    --bg-body: var(--brand-cream);
+    --bg-page: var(--brand-cream);
     --bg-card: #ffffff;
-    --border-color: #e2e8f0;
+    --border-color: var(--brand-gray);
     --success: #10b981;
     --danger: #ef4444;
     --warning: #f59e0b;
@@ -47,7 +53,7 @@ html, body {
 }
 
 body {
-    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-body);
     background-color: var(--bg-body);
     color: var(--text-main);
     line-height: 1.5;
@@ -63,11 +69,12 @@ body {
     border-radius: var(--radius-xl);
     padding: 2.5rem;
     box-shadow: var(--shadow-lg);
-    border-top: 5px solid var(--brand-teal);
+    border-top: 5px solid var(--brand-cyan);
 }
 
-/* Typography */
+/* Typography — Poppins títulos/CTA, Montserrat cuerpo */
 h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
     color: var(--brand-blue);
 }
 
@@ -125,6 +132,7 @@ h3 { margin-top: 0; font-weight: 700; }
 }
 
 .brand-text h1 {
+    font-family: var(--font-display);
     text-align: left;
     font-size: 2.5rem;
     font-weight: 800;
@@ -146,6 +154,7 @@ h3 { margin-top: 0; font-weight: 700; }
 }
 
 .brand-text .subtitle {
+    font-family: var(--font-body);
     text-align: left;
     margin-left: 0;
     font-size: 1.05rem;
@@ -166,12 +175,13 @@ h3 { margin-top: 0; font-weight: 700; }
     display: flex;
     justify-content: center;
     gap: 0.25rem;
-    background: var(--bg-body);
+    background: var(--brand-beige);
     padding: 0.4rem;
     border-radius: var(--radius-lg);
 }
 
 .nav-button {
+    font-family: var(--font-display);
     padding: 0.65rem 1.5rem;
     border: none;
     background: transparent;
@@ -213,6 +223,7 @@ h3 { margin-top: 0; font-weight: 700; }
    SECTION TITLES
    ============================================= */
 .section-title {
+    font-family: var(--font-display);
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--brand-blue);
@@ -262,6 +273,7 @@ h3 { margin-top: 0; font-weight: 700; }
 }
 
 .sede-btn {
+    font-family: var(--font-display);
     padding: 0.5rem 1.25rem;
     border: 2px solid var(--border-color);
     border-radius: 9999px;
@@ -275,14 +287,14 @@ h3 { margin-top: 0; font-weight: 700; }
 }
 
 .sede-btn:hover { border-color: var(--primary); color: var(--primary); }
-.sede-btn.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 6px -1px rgba(28, 61, 125, 0.25); }
+.sede-btn.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 6px -1px rgba(23, 56, 88, 0.25); }
 
 /* =============================================
    BOOKING MODE SELECTOR
    ============================================= */
 .booking-mode-container {
     margin-bottom: 2.5rem;
-    background: #f8fafc;
+    background: var(--brand-beige);
     padding: 1.5rem;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-color);
@@ -302,6 +314,7 @@ h3 { margin-top: 0; font-weight: 700; }
 }
 
 .mode-btn {
+    font-family: var(--font-display);
     flex: 1;
     display: flex;
     align-items: center;
@@ -325,7 +338,7 @@ h3 { margin-top: 0; font-weight: 700; }
     background: white;
     color: var(--primary);
     border-color: var(--primary);
-    box-shadow: 0 0 0 4px rgba(28, 61, 125, 0.08);
+    box-shadow: 0 0 0 4px rgba(23, 56, 88, 0.08);
 }
 
 .mode-icon { flex-shrink: 0; }
@@ -362,13 +375,13 @@ h3 { margin-top: 0; font-weight: 700; }
 .esp-card:hover, .prof-card:hover {
     border-color: var(--secondary);
     transform: translateY(-4px);
-    box-shadow: 0 12px 20px -8px rgba(91, 194, 231, 0.2);
+    box-shadow: 0 12px 20px -8px rgba(95, 169, 221, 0.25);
 }
 
 .esp-card.selected, .prof-card.selected {
     border-color: var(--primary);
     background: var(--primary-light);
-    box-shadow: 0 0 0 4px rgba(28, 61, 125, 0.1);
+    box-shadow: 0 0 0 4px rgba(23, 56, 88, 0.1);
 }
 
 .esp-card-icon {
@@ -474,7 +487,7 @@ h3 { margin-top: 0; font-weight: 700; }
 .form-input:focus, .form-select:focus {
     outline: none;
     border-color: var(--secondary);
-    box-shadow: 0 0 0 4px rgba(91, 194, 231, 0.2);
+    box-shadow: 0 0 0 4px rgba(95, 169, 221, 0.2);
     background-color: white;
 }
 
@@ -501,14 +514,14 @@ h3 { margin-top: 0; font-weight: 700; }
 
 .phone-wrapper:focus-within {
     border-color: var(--secondary);
-    box-shadow: 0 0 0 4px rgba(91, 194, 231, 0.2);
+    box-shadow: 0 0 0 4px rgba(95, 169, 221, 0.2);
 }
 
 .phone-prefix {
     display: flex;
     align-items: center;
     padding: 0 1rem;
-    background: #f8fafc;
+    background: var(--brand-cream);
     color: var(--text-secondary);
     font-weight: 700;
     border-right: 1px solid var(--border-color);
@@ -529,6 +542,7 @@ h3 { margin-top: 0; font-weight: 700; }
    BUTTONS
    ============================================= */
 .save-button {
+    font-family: var(--font-display);
     display: inline-flex;
     justify-content: center;
     align-items: center;
@@ -643,7 +657,7 @@ h3 { margin-top: 0; font-weight: 700; }
     background: var(--primary) !important;
     color: white !important;
     border-color: var(--primary) !important;
-    box-shadow: 0 8px 16px -4px rgba(28, 61, 125, 0.3);
+    box-shadow: 0 8px 16px -4px rgba(23, 56, 88, 0.3);
 }
 
 .date-card.is-current-day { box-shadow: 0 0 0 2px var(--primary-bg) inset; }
@@ -718,6 +732,7 @@ h3 { margin-top: 0; font-weight: 700; }
 .turno-actions { display: flex; gap: 1rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color); }
 
 .btn-reagendar, .btn-cancelar {
+    font-family: var(--font-display);
     flex: 1;
     padding: 0.75rem 1rem;
     border-radius: var(--radius-md);
