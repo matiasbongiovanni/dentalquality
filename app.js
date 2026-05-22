@@ -632,6 +632,10 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         setStatus(status, 'El DNI debe tener 7 u 8 dígitos numéricos.');
         return;
     }
+    if (/^(\d)\1+$/.test(dni)) {
+        setStatus(status, 'El DNI ingresado no es válido.');
+        return;
+    }
     if (!/^\d{10}$/.test(telRaw)) {
         setStatus(status, 'El teléfono debe tener 10 dígitos (sin el 549).');
         return;
