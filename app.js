@@ -34,14 +34,6 @@ const SVG_ICONS = {
         <path d="M12 2C9 2 6 4.2 6 7c0 2 .5 3.6 1 5.6L8.2 20c.3 1.4 1 1.5 1.4 1.5s1-.4 1.2-1.5l.2-.8.2.8c.2 1.1.8 1.5 1.2 1.5s1.1-.1 1.4-1.5L15 12.6c.5-2 1-3.6 1-5.6C16 4.2 15 2 12 2z"/>
     </svg>`,
 
-    'estetica-dental': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M10 3C7.5 3 5 5 5 7.5c0 1.8.4 3.2.9 5L7.2 19c.3 1.3 1 1.5 1.3 1.5s.9-.4 1.1-1.4l.4-1.1.4 1.1c.2 1 .8 1.4 1.1 1.4s1-.2 1.3-1.5l1.3-6.5c.5-1.8.9-3.2.9-5C15 5 12.5 3 10 3z"/>
-        <line x1="18" y1="2" x2="18" y2="6"/>
-        <line x1="16" y1="4" x2="20" y2="4"/>
-        <line x1="21" y1="8.5" x2="21" y2="11.5"/>
-        <line x1="19.5" y1="10" x2="22.5" y2="10"/>
-    </svg>`,
-
     'ortodoncia-alineadores': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M7 3C5.3 3 4 4.5 4 6.3c0 1.3.3 2.3.6 3.6L5.5 14c.2.9.7 1 1 1s.6-.3.8-1l.2-.6.2.6c.2.7.5 1 .8 1s.8-.1 1-1l.9-4.1c.3-1.3.6-2.3.6-3.6C11 4.5 8.7 3 7 3z"/>
         <path d="M17 3c-1.7 0-3 1.5-3 3.3 0 1.3.3 2.3.6 3.6L15.5 14c.2.9.7 1 1 1s.6-.3.8-1l.2-.6.2.6c.2.7.5 1 .8 1s.8-.1 1-1l.9-4.1c.3-1.3.6-2.3.6-3.6C21 4.5 18.7 3 17 3z"/>
@@ -88,13 +80,6 @@ const ESPECIALIDADES = [
         tratamientos: ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración']
     },
     {
-        id: 'estetica-dental',
-        label: 'Estética Dental',
-        desc: 'Blanqueamiento, carillas y diseño de sonrisa',
-        searchKey: 'estet',
-        tratamientos: ['Blanqueamiento dental', 'Carillas de porcelana', 'Composite estético', 'Diseño de sonrisa', 'Consulta estética']
-    },
-    {
         id: 'ortodoncia-alineadores',
         label: 'Ortodoncia y Alineadores',
         desc: 'Brackets, Invisalign y corrección dental',
@@ -106,6 +91,7 @@ const ESPECIALIDADES = [
         label: 'Implantes y Prótesis',
         desc: 'Implantes, coronas y prótesis dentales',
         searchKey: 'implant',
+        searchKeys: ['implant', 'protesis', 'prótesis'],
         tratamientos: ['Consulta de implantes', 'Colocación de implante', 'Control post-operatorio', 'Corona sobre implante', 'Consulta de prótesis', 'Prótesis fija', 'Prótesis removible', 'Prótesis total']
     },
     {
@@ -184,7 +170,7 @@ function renderEspecialidadCards() {
             card.classList.add('selected');
             especialidadSeleccionada = esp;
             actualizarTratamientos(esp.tratamientos);
-            cargarSlotsEspecialidad(esp.searchKey);
+            cargarSlotsEspecialidad(esp.searchKeys || [esp.searchKey]);
         };
         grid.appendChild(card);
     });
@@ -392,7 +378,9 @@ function onProfesionalCardSelected(prof) {
 // =============================================
 // 2A. CARGAR SLOTS POR ESPECIALIDAD
 // =============================================
-async function cargarSlotsEspecialidad(especialidad) {
+async function cargarSlotsEspecialidad(keys) {
+    // keys puede ser string o array de strings
+    const searchKeys = Array.isArray(keys) ? keys : [keys];
     const formContainer = document.getElementById('agendarFormContainer');
     const dateContainer = document.getElementById('datePickerContainer');
 
@@ -402,7 +390,7 @@ async function cargarSlotsEspecialidad(especialidad) {
     document.getElementById('appointmentTime').value = '';
     document.getElementById('timeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha para ver horarios.</p>';
 
-    if (!especialidad) {
+    if (!searchKeys.length || !searchKeys[0]) {
         formContainer.style.display = 'none';
         return;
     }
@@ -421,7 +409,20 @@ async function cargarSlotsEspecialidad(especialidad) {
     try {
         // Normalizar sede para comparación insensitive (acento + case)
         const sedeNorm = sedeSeleccionada.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-        const profs = await supaFetch(`/profesionales?select=*&especialidades=ilike.*${encodeURIComponent(especialidad)}*&sede=ilike.*${encodeURIComponent(sedeNorm)}*`);
+
+        // Hacer una query por cada searchKey y deduplicar por calendar_id
+        const allProfsArrays = await Promise.all(
+            searchKeys.map(key =>
+                supaFetch(`/profesionales?select=*&especialidades=ilike.*${encodeURIComponent(key)}*&sede=ilike.*${encodeURIComponent(sedeNorm)}*`)
+                    .catch(() => [])
+            )
+        );
+        const seenCalIds = new Set();
+        const profs = allProfsArrays.flat().filter(p => {
+            if (seenCalIds.has(p.calendar_id)) return false;
+            seenCalIds.add(p.calendar_id);
+            return true;
+        });
 
         if (!profs.length) {
             dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">No hay profesionales para esta especialidad en esta sede.</p>';
