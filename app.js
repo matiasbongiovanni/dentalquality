@@ -621,6 +621,7 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
     const telRaw    = document.getElementById('telefono').value.replace(/\D/g, '');
     const telefono  = '549' + telRaw;
     const obraSocial = document.getElementById('obraSocial')?.value || '';
+    const email = document.getElementById('email')?.value.trim() || '';
     const tratamiento = document.getElementById('tratamiento').value.trim();
     const startTime = document.getElementById('appointmentTime').value;
 
@@ -728,6 +729,28 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         }
 
         document.getElementById('successModal')?.classList.add('active');
+
+        // Confirmación por email — fire-and-forget (no bloquea ni revierte el agendamiento)
+        if (email) {
+            fetch('/api/send-confirmacion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email,
+                    first_name: nombre,
+                    last_name: apellido,
+                    full_name: `${nombre} ${apellido}`,
+                    phone: telefono,
+                    Tratamiento: tratamiento,
+                    'Obra Social': obraSocial,
+                    profesional: slotSeleccionado?.profesionalNombre || '',
+                    sede: slotSeleccionado?.sedeName || slotSeleccionado?.calendarName || '',
+                    startTime,
+                    appointmentId
+                })
+            }).catch(() => {});
+        }
+
         document.getElementById('agendarForm').reset();
         document.getElementById('agendarFormContainer').style.display = 'none';
         disponibilidadGlobal = {};
