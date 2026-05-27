@@ -728,6 +728,12 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
             throw new Error('No se pudo registrar el turno. Por favor reintentá en unos minutos.');
         }
 
+        const successMsg = document.getElementById('successModalMsg');
+        if (successMsg) {
+            successMsg.textContent = email
+                ? `Te enviamos la confirmación a ${email}.`
+                : 'Recibirás la confirmación en tu WhatsApp.';
+        }
         document.getElementById('successModal')?.classList.add('active');
 
         // Confirmación por email — fire-and-forget (no bloquea ni revierte el agendamiento)
