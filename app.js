@@ -443,14 +443,12 @@ async function cargarSlotsEspecialidad(keys) {
             return;
         }
 
-        const now = Date.now();
-        const end = now + 90 * 24 * 60 * 60 * 1000;
         const tz = TZ;
 
         const results = await Promise.all(profs.map(async prof => {
             try {
-                const raw = await ghlFetch(`calendars/${prof.calendar_id}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
-                return parsearSlots(raw, prof);
+                const merged = await ghlFetchSlots3Months(prof.calendar_id, tz);
+                return parsearSlots(merged, prof);
             } catch { return []; }
         }));
 
@@ -493,12 +491,10 @@ async function cargarSlotsCalendar(calendarId) {
 
     try {
         const prof = profesionalesCache.find(p => p.calendar_id === calendarId);
-        const now = Date.now();
-        const end = now + 90 * 24 * 60 * 60 * 1000;
         const tz = TZ;
 
-        const raw = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
-        const slots = parsearSlots(raw, prof || { calendar_id: calendarId, profesional: 'Profesional', sede: '' });
+        const merged = await ghlFetchSlots3Months(calendarId, tz);
+        const slots = parsearSlots(merged, prof || { calendar_id: calendarId, profesional: 'Profesional', sede: '' });
         poblarDisponibilidad([slots]);
         dibujarTarjetasDeDias(dateContainer);
     } catch (e) {
@@ -509,6 +505,21 @@ async function cargarSlotsCalendar(calendarId) {
 // =============================================
 // HELPERS DE SLOTS
 // =============================================
+
+// GHL limita el rango a 31 días por request. Para cubrir 3 meses hacemos 3 chunks.
+async function ghlFetchSlots3Months(calendarId, tz) {
+    const CHUNK = 30 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const chunks = await Promise.all([0, 1, 2].map(i =>
+        ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now + i * CHUNK}&endDate=${now + (i + 1) * CHUNK}&timezone=${encodeURIComponent(tz)}`).catch(() => ({}))
+    ));
+    const merged = {};
+    chunks.forEach(raw => {
+        const map = raw?.slots || raw?.data || raw || {};
+        Object.assign(merged, map);
+    });
+    return merged;
+}
 
 // GHL devuelve ISOs sin timezone ("2026-05-20T09:00:00") cuando se pide ART.
 // Sin offset, new Date() los interpreta como UTC → 3h de diferencia.
@@ -1110,14 +1121,12 @@ async function abrirReagendamiento(d) {
     }
 
     try {
-        const now = Date.now();
-        const end = now + 90 * 24 * 60 * 60 * 1000;
         const tz = TZ;
 
-        // Fetch en paralelo: detalle del calendario (slotDuration) + free-slots
+        // Fetch en paralelo: detalle del calendario (slotDuration) + free-slots (3 meses)
         const [calInfo, slotsData] = await Promise.all([
             ghlFetch(`calendars/${calendarId}`).catch(() => null),
-            ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`)
+            ghlFetchSlots3Months(calendarId, tz)
         ]);
 
         const slotDuration = parseInt(
@@ -1129,7 +1138,7 @@ async function abrirReagendamiento(d) {
         ) || 30;
         document.getElementById('rescheduleSlotDuration').value = String(slotDuration);
 
-        _rescheduleSlotsMap = slotsData?.slots || slotsData?.data || slotsData || {};
+        _rescheduleSlotsMap = slotsData;
         renderRescheduleDates(_rescheduleSlotsMap, d.currentIso);
     } catch (e) {
         container.innerHTML = `<p style="color:var(--danger);margin:auto;">Error al cargar agenda: ${escapeHtml(e.message)}</p>`;
@@ -1299,11 +1308,8 @@ async function confirmarReagendamiento() {
             setRescheduleStatus(status, 'Ese horario se ocupó. Elegí otro.', 'danger');
             // Recargar slots
             try {
-                const now = Date.now();
-                const end = now + 90 * 24 * 60 * 60 * 1000;
                 const tz = TZ;
-                const slotsData = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
-                _rescheduleSlotsMap = slotsData?.slots || slotsData?.data || slotsData || {};
+                _rescheduleSlotsMap = await ghlFetchSlots3Months(calendarId, tz);
                 renderRescheduleDates(_rescheduleSlotsMap, currentIso);
                 document.getElementById('rescheduleTimeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha.</p>';
             } catch (_) {}
