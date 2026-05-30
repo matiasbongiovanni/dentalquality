@@ -34,6 +34,13 @@ const SVG_ICONS = {
         <path d="M12 2C9 2 6 4.2 6 7c0 2 .5 3.6 1 5.6L8.2 20c.3 1.4 1 1.5 1.4 1.5s1-.4 1.2-1.5l.2-.8.2.8c.2 1.1.8 1.5 1.2 1.5s1.1-.1 1.4-1.5L15 12.6c.5-2 1-3.6 1-5.6C16 4.2 15 2 12 2z"/>
     </svg>`,
 
+    'estetica-dental': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3C9 3 7 5.2 7 7.8c0 1.1.2 2 .6 3.2L8.8 15h6.4l1.2-4c.4-1.2.6-2.1.6-3.2C17 5.2 15 3 12 3z"/>
+        <path d="M9.5 15v1.2a2.5 2.5 0 005 0V15"/>
+        <path d="M10 9.5h4M9.5 12h5"/>
+        <path d="M19 4l1.5-1.5M20.5 6H22M19 8l1.5 1.5"/>
+    </svg>`,
+
     'ortodoncia-alineadores': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M7 3C5.3 3 4 4.5 4 6.3c0 1.3.3 2.3.6 3.6L5.5 14c.2.9.7 1 1 1s.6-.3.8-1l.2-.6.2.6c.2.7.5 1 .8 1s.8-.1 1-1l.9-4.1c.3-1.3.6-2.3.6-3.6C11 4.5 8.7 3 7 3z"/>
         <path d="M17 3c-1.7 0-3 1.5-3 3.3 0 1.3.3 2.3.6 3.6L15.5 14c.2.9.7 1 1 1s.6-.3.8-1l.2-.6.2.6c.2.7.5 1 .8 1s.8-.1 1-1l.9-4.1c.3-1.3.6-2.3.6-3.6C21 4.5 18.7 3 17 3z"/>
@@ -78,6 +85,13 @@ const ESPECIALIDADES = [
         desc: 'Consultas, limpiezas y caries',
         searchKey: 'odontolog',
         tratamientos: ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración']
+    },
+    {
+        id: 'estetica-dental',
+        label: 'Estética Dental',
+        desc: 'Reconstrucción, incrustaciones, carillas y coronas',
+        searchKey: 'stética',
+        tratamientos: ['Reconstrucción', 'Incrustación', 'Carillas', 'Coronas']
     },
     {
         id: 'ortodoncia-alineadores',
@@ -626,8 +640,12 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
     const startTime = document.getElementById('appointmentTime').value;
 
     // Validaciones
-    if (!nombre || !apellido || !dni || !telRaw) {
+    if (!nombre || !apellido || !dni || !telRaw || !email) {
         setStatus(status, 'Completá todos los campos obligatorios.');
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setStatus(status, 'Ingresá un email válido.');
         return;
     }
     if (!/^\d{7,8}$/.test(dni)) {
