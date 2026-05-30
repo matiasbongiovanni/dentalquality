@@ -444,7 +444,7 @@ async function cargarSlotsEspecialidad(keys) {
         }
 
         const now = Date.now();
-        const end = now + 30 * 24 * 60 * 60 * 1000;
+        const end = now + 90 * 24 * 60 * 60 * 1000;
         const tz = TZ;
 
         const results = await Promise.all(profs.map(async prof => {
@@ -456,7 +456,7 @@ async function cargarSlotsEspecialidad(keys) {
 
         const allSlots = results.flat();
         if (allSlots.length === 0) {
-            dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">Sin turnos disponibles en los próximos 30 días para esta especialidad. Probá con la otra sede o contactanos por WhatsApp.</p>';
+            dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">Sin turnos disponibles en los próximos 3 meses para esta especialidad. Probá con la otra sede o contactanos por WhatsApp.</p>';
             return;
         }
 
@@ -494,7 +494,7 @@ async function cargarSlotsCalendar(calendarId) {
     try {
         const prof = profesionalesCache.find(p => p.calendar_id === calendarId);
         const now = Date.now();
-        const end = now + 30 * 24 * 60 * 60 * 1000;
+        const end = now + 90 * 24 * 60 * 60 * 1000;
         const tz = TZ;
 
         const raw = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
@@ -1111,7 +1111,7 @@ async function abrirReagendamiento(d) {
 
     try {
         const now = Date.now();
-        const end = now + 30 * 24 * 60 * 60 * 1000;
+        const end = now + 90 * 24 * 60 * 60 * 1000;
         const tz = TZ;
 
         // Fetch en paralelo: detalle del calendario (slotDuration) + free-slots
@@ -1300,7 +1300,7 @@ async function confirmarReagendamiento() {
             // Recargar slots
             try {
                 const now = Date.now();
-                const end = now + 30 * 24 * 60 * 60 * 1000;
+                const end = now + 90 * 24 * 60 * 60 * 1000;
                 const tz = TZ;
                 const slotsData = await ghlFetch(`calendars/${calendarId}/free-slots?startDate=${now}&endDate=${end}&timezone=${encodeURIComponent(tz)}`);
                 _rescheduleSlotsMap = slotsData?.slots || slotsData?.data || slotsData || {};
