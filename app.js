@@ -25,6 +25,7 @@ let disponibilidadGlobal = {};
 let slotSeleccionado = null;
 let bookingMode = 'profesional';
 let profesionalesCache = []; // cache de profesionales de Supabase
+let especialidadProfesionalesCache = []; // profs de la especialidad seleccionada actualmente
 
 // =============================================
 // SVG ICONS (stroke-based, brand colors)
@@ -183,8 +184,14 @@ function renderEspecialidadCards() {
             document.querySelectorAll('.esp-card').forEach(c => c.classList.remove('selected'));
             card.classList.add('selected');
             especialidadSeleccionada = esp;
-            actualizarTratamientos(esp.tratamientos);
-            cargarSlotsEspecialidad(esp.searchKeys || [esp.searchKey]);
+            especialidadProfesionalesCache = [];
+            if (!sedeSeleccionada) {
+                document.getElementById('agendarFormContainer').style.display = 'block';
+                document.getElementById('datePickerContainer').innerHTML =
+                    '<p class="placeholder-text" style="margin:auto;">Primero seleccioná una sede.</p>';
+                return;
+            }
+            cargarTratamientosPorEspecialidad(esp.searchKeys || [esp.searchKey], sedeSeleccionada);
         };
         grid.appendChild(card);
     });
@@ -192,7 +199,17 @@ function renderEspecialidadCards() {
     container.appendChild(grid);
 }
 
-function actualizarTratamientos(lista) {
+// Normaliza tratamientos: acepta array (jsonb) o string de texto (csv / newlines)
+function normalizarTratamientos(raw) {
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (!raw || typeof raw !== 'string') return [];
+    return raw
+        .split(/[\n\r,]+/)
+        .map(t => t.replace(/^[-\s]+/, '').trim())
+        .filter(t => t.length > 0);
+}
+
+function poblarTratamientos(lista) {
     const sel = document.getElementById('tratamiento');
     if (!sel) return;
     sel.innerHTML = '<option value="">Seleccioná el tratamiento</option>';
@@ -204,13 +221,6 @@ function actualizarTratamientos(lista) {
     });
 }
 
-function actualizarTratamientosPorNombre(nombre) {
-    const esp = ESPECIALIDADES.find(e =>
-        nombre.toLowerCase().includes(e.searchKey) || e.searchKey.includes(nombre.toLowerCase().slice(0, 5))
-    );
-    actualizarTratamientos(esp ? esp.tratamientos : ['Consulta general', 'Control / Revisación', 'Urgencia']);
-}
-
 function resetBookingForm() {
     disponibilidadGlobal = {};
     slotSeleccionado = null;
@@ -219,7 +229,7 @@ function resetBookingForm() {
     document.getElementById('appointmentTime').value = '';
     document.getElementById('timeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha para ver horarios.</p>';
     document.getElementById('datePickerContainer').innerHTML = '<p class="placeholder-text">Cargando agenda...</p>';
-    document.getElementById('tratamiento').innerHTML = '<option value="">Seleccioná primero una especialidad</option>';
+    document.getElementById('tratamiento').innerHTML = '<option value="">Seleccioná primero una especialidad o profesional</option>';
 }
 
 // =============================================
@@ -384,8 +394,9 @@ function onProfesionalChange() {
 }
 
 function onProfesionalCardSelected(prof) {
-    const primeraEsp = (prof.especialidades || '').split(',')[0].replace(/^-\s*/, '').trim();
-    actualizarTratamientosPorNombre(primeraEsp);
+    const parsed = normalizarTratamientos(prof.tratamientos);
+    const lista = parsed.length ? parsed : ['Consulta general', 'Control / Revisación', 'Urgencia'];
+    poblarTratamientos(lista);
     cargarSlotsCalendar(prof.calendar_id);
 }
 
@@ -1436,6 +1447,115 @@ if (telInput) {
         telInput.value = clean.slice(0, 10);
     });
 }
+
+// =============================================
+// CARGAR TRATAMIENTOS DESDE SUPABASE (por especialidad)
+// =============================================
+async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
+    const sel = document.getElementById('tratamiento');
+    const formContainer = document.getElementById('agendarFormContainer');
+
+    resetBookingForm();
+    if (sel) sel.innerHTML = '<option value="">Cargando tratamientos...</option>';
+    formContainer.style.display = 'block';
+    formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+        const sedeNorm = sede.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+        const allProfsArrays = await Promise.all(
+            searchKeys.map(key =>
+                supaFetch(`/profesionales?select=*&especialidades=ilike.*${encodeURIComponent(key)}*&sede=ilike.*${encodeURIComponent(sedeNorm)}*`)
+                    .catch(() => [])
+            )
+        );
+        const seenIds = new Set();
+        especialidadProfesionalesCache = allProfsArrays.flat().filter(p => {
+            if (seenIds.has(p.calendar_id)) return false;
+            seenIds.add(p.calendar_id);
+            return true;
+        });
+
+        if (!especialidadProfesionalesCache.length) {
+            if (sel) sel.innerHTML = '<option value="">No hay profesionales para esta especialidad en esta sede</option>';
+            document.getElementById('datePickerContainer').innerHTML =
+                '<p class="placeholder-text" style="margin:auto;">No hay profesionales para esta especialidad en esta sede.</p>';
+            return;
+        }
+
+        const tratamientosSet = new Set();
+        especialidadProfesionalesCache.forEach(p => {
+            normalizarTratamientos(p.tratamientos).forEach(t => tratamientosSet.add(t));
+        });
+
+        const tratamientos = [...tratamientosSet].sort();
+        poblarTratamientos(tratamientos.length
+            ? tratamientos
+            : ['Consulta general', 'Control / Revisación', 'Urgencia']
+        );
+
+        document.getElementById('datePickerContainer').innerHTML =
+            '<p class="placeholder-text" style="margin:auto;">Seleccioná un tratamiento para ver disponibilidad.</p>';
+
+    } catch (e) {
+        if (sel) sel.innerHTML = '<option value="">Error al cargar tratamientos</option>';
+        console.error('[cargarTratamientosPorEspecialidad]', e);
+    }
+}
+
+// =============================================
+// CARGAR SLOTS DESDE LISTA DE PROFESIONALES
+// =============================================
+async function cargarSlotsDesdeProfs(profs) {
+    const dateContainer = document.getElementById('datePickerContainer');
+    disponibilidadGlobal = {};
+    slotSeleccionado = null;
+    document.getElementById('appointmentDate').value = '';
+    document.getElementById('appointmentTime').value = '';
+    document.getElementById('timeSlotsContainer').innerHTML =
+        '<p class="placeholder-text">Seleccioná una fecha para ver horarios.</p>';
+
+    dateContainer.innerHTML = '<p class="placeholder-text" style="margin:auto;">Buscando turnos disponibles...</p>';
+
+    try {
+        const tz = TZ;
+        const results = await Promise.all(profs.map(async prof => {
+            try {
+                const merged = await ghlFetchSlots3Months(prof.calendar_id, tz);
+                return parsearSlots(merged, prof);
+            } catch { return []; }
+        }));
+        const allSlots = results.flat();
+        if (!allSlots.length) {
+            dateContainer.innerHTML =
+                '<p class="placeholder-text" style="margin:auto;">Sin turnos disponibles en los próximos 3 meses. Contactanos por WhatsApp.</p>';
+            return;
+        }
+        poblarDisponibilidad([allSlots]);
+        dibujarTarjetasDeDias(dateContainer);
+    } catch (e) {
+        dateContainer.innerHTML = `<p style="color:var(--danger);margin:auto;">Error: ${escapeHtml(e.message)}</p>`;
+    }
+}
+
+// Listener: cuando cambia el tratamiento en modo especialidad, cargar slots del prof que lo ofrece
+document.getElementById('tratamiento')?.addEventListener('change', function () {
+    if (bookingMode !== 'especialidad') return;
+    const tratamientoElegido = this.value;
+    if (!tratamientoElegido) {
+        document.getElementById('datePickerContainer').innerHTML =
+            '<p class="placeholder-text" style="margin:auto;">Seleccioná un tratamiento para ver disponibilidad.</p>';
+        return;
+    }
+    const profsConTratamiento = especialidadProfesionalesCache.filter(p =>
+        normalizarTratamientos(p.tratamientos).includes(tratamientoElegido)
+    );
+    if (!profsConTratamiento.length) {
+        document.getElementById('datePickerContainer').innerHTML =
+            '<p class="placeholder-text" style="margin:auto;">No hay disponibilidad para ese tratamiento en esta sede. Contactanos por WhatsApp.</p>';
+        return;
+    }
+    cargarSlotsDesdeProfs(profsConTratamiento);
+});
 
 // =============================================
 // INIT
