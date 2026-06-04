@@ -43,7 +43,7 @@
             <p class="subtitle-sm" style="text-align:center; margin-bottom:1.5rem;">Seleccioná la sede y elegí cómo querés agendar tu cita.</p>
 
             <div style="background:#fff8e1; border:1.5px solid #f59e0b; border-radius:10px; padding:1rem 1.25rem; margin-bottom:1.5rem; font-size:0.92rem; color:#78350f; line-height:1.7;">
-                <strong>⚠️ Turnos para cirugías e implantes:</strong><br>
+                <strong>⚠️ Cirugías mayores (injertos óseos, extracciones complejas):</strong><br>
                 Comunicarse directamente por teléfono:<br>
                 <strong>Lomas:</strong> 📞 4244-7686 &nbsp;|&nbsp; 📞 4244-7640 &nbsp;|&nbsp; 📞 4600-4516<br>
                 <strong>Lanús:</strong> 📞 4240-0355
@@ -157,9 +157,10 @@
 
                     <div class="form-group full-width">
                         <label class="form-label">Tratamiento <span style="color:#ef4444;">*</span></label>
-                        <select id="tratamiento" class="form-select" required>
-                            <option value="">Seleccioná primero una especialidad</option>
-                        </select>
+                        <div id="tratamientoChips" class="tratamiento-chips-container">
+                            <p class="placeholder-text" style="color:rgba(23, 56, 88, 0.65);">Seleccioná primero una especialidad o profesional.</p>
+                        </div>
+                        <input type="hidden" id="tratamiento">
                     </div>
 
                     <h2 class="section-title full-width" style="margin-top:0.5rem;">Elegí el horario</h2>
@@ -314,6 +315,18 @@
             <h3>¡Turno cancelado!</h3>
             <p class="subtitle-sm" style="color:rgba(23, 56, 88, 0.65);">Se ha cancelado tu turno correctamente.</p>
             <button class="save-button" onclick="cerrarModal('cancelSuccessModal'); selectTab('misturnos');">Entendido</button>
+        </div>
+    </div>
+
+    <div id="preConfirmModal" class="modal-overlay">
+        <div class="modal-content" style="max-width:420px;">
+            <h3 style="margin-bottom:1.25rem;">Revisá tu turno</h3>
+            <div id="preConfirmSummary" style="background:rgba(95,169,221,0.10); border-radius:0.75rem; padding:1rem 1.25rem; font-size:0.92rem; color:#173858; line-height:1.8; margin-bottom:1.5rem;"></div>
+            <div style="display:flex; gap:0.75rem;">
+                <button type="button" class="save-button" style="flex:1; background:var(--brand-gray); color:var(--brand-blue);" onclick="cerrarModal('preConfirmModal')">Editar</button>
+                <button type="button" class="save-button" style="flex:1;" id="preConfirmSubmitBtn">Confirmar Turno</button>
+            </div>
+            <div id="preConfirmStatus" class="status-msg" style="margin-top:0.75rem;"></div>
         </div>
     </div>
 

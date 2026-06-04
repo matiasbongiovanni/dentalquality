@@ -124,7 +124,8 @@ test.describe('Flujo de agendamiento (mocked)', () => {
         await page.goto('/');
         await page.selectOption('#sedePicker', 'Lanus');
         await page.click('[data-mode="especialidad"]');
-        await expect(page.locator('.esp-card')).toHaveCount(6);
+        // 7 especialidades: odontología general, estética, ortodoncia, implantes/prótesis, ATM, odontopediatría, endodoncia/conductos
+        await expect(page.locator('.esp-card')).toHaveCount(7);
     });
 
     test('DNI con formato inválido no dispara lookup', async ({ page }) => {

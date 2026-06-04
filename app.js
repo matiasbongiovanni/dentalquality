@@ -73,6 +73,12 @@ const SVG_ICONS = {
     'odontopediatria': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 7C10 7 8 8.5 8 10.5c0 1.5.3 2.5.7 4l.9 5c.3 1.2.9 1.3 1.2 1.3s.8-.3 1-1.1l.2-.6.2.6c.2.8.7 1.1 1 1.1s.9-.1 1.2-1.3l.9-5c.4-1.5.7-2.5.7-4C16 8.5 14 7 12 7z"/>
         <path d="M9.5 5C9.2 4.2 8.3 3.8 7.7 4.3c-.7.6-.5 1.5.4 2.3C8.8 7.2 9.5 7.5 10 7.7c.1 0 .1 0 .5-.2.5-.3 1.2-.7 1.8-1.2.9-.8 1.1-1.7.4-2.3C12.1 3.5 11 3.8 10.5 5"/>
+    </svg>`,
+
+    'endodoncia-conductos': `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3C9.5 3 7 5 7 8c0 2 .6 3.5 1.2 5.5L9.5 20c.3 1.2.9 1.3 1.2 1.3s.8-.3 1-1.2l.3-.8.3.8c.2.9.7 1.2 1 1.2s.9-.1 1.2-1.3l1.3-6.5C16.4 11.5 17 10 17 8c0-3-2.5-5-5-5z"/>
+        <line x1="9.5" y1="10" x2="14.5" y2="10" stroke-width="1.2"/>
+        <line x1="12" y1="3" x2="12" y2="10" stroke-width="1.2" stroke-dasharray="1.5 1.5"/>
     </svg>`
 };
 
@@ -122,6 +128,13 @@ const ESPECIALIDADES = [
         desc: 'Atención dental y ortopédica para niños',
         searchKey: 'pediatr',
         tratamientos: ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil', 'Aparatología removible', 'Ortopedia maxilar']
+    },
+    {
+        id: 'endodoncia-conductos',
+        label: 'Endodoncia y Conductos',
+        desc: 'Tratamientos de conducto y endodoncia',
+        searchKeys: ['endodoncia', 'conducto'],
+        tratamientos: []
     },
 ];
 
@@ -210,14 +223,29 @@ function normalizarTratamientos(raw) {
 }
 
 function poblarTratamientos(lista) {
-    const sel = document.getElementById('tratamiento');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">Seleccioná el tratamiento</option>';
+    const container = document.getElementById('tratamientoChips');
+    const hidden = document.getElementById('tratamiento');
+    if (!container || !hidden) return;
+    hidden.value = '';
+    if (!lista || lista.length === 0) {
+        container.innerHTML = '<p class="placeholder-text" style="color:rgba(23, 56, 88, 0.65);">No hay tratamientos disponibles.</p>';
+        return;
+    }
+    container.innerHTML = '';
     lista.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t;
-        opt.textContent = t;
-        sel.appendChild(opt);
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'tratamiento-chip';
+        chip.dataset.value = t;
+        const durMin = getDuracionMinutos(t);
+        chip.innerHTML = `<span class="chip-label">${escapeHtml(t)}</span>${durMin ? `<span class="chip-badge">${durMin} min</span>` : ''}`;
+        chip.addEventListener('click', () => {
+            container.querySelectorAll('.tratamiento-chip').forEach(c => c.classList.remove('selected'));
+            chip.classList.add('selected');
+            hidden.value = t;
+            hidden.dispatchEvent(new Event('change'));
+        });
+        container.appendChild(chip);
     });
 }
 
@@ -229,7 +257,26 @@ function resetBookingForm() {
     document.getElementById('appointmentTime').value = '';
     document.getElementById('timeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha para ver horarios.</p>';
     document.getElementById('datePickerContainer').innerHTML = '<p class="placeholder-text">Cargando agenda...</p>';
-    document.getElementById('tratamiento').innerHTML = '<option value="">Seleccioná primero una especialidad o profesional</option>';
+    const tChips = document.getElementById('tratamientoChips');
+    if (tChips) tChips.innerHTML = '<p class="placeholder-text">Seleccioná primero una especialidad o profesional.</p>';
+    const tHidden = document.getElementById('tratamiento');
+    if (tHidden) tHidden.value = '';
+}
+
+// =============================================
+// DURACIÓN POR TRATAMIENTO
+// Retorna minutos para tratamientos específicos; null = usar slotDuration del calendario
+// =============================================
+function getDuracionMinutos(tratamiento) {
+    const t = (tratamiento || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    // Consulta de implantes → 20 min (debe ir antes del match genérico de implante)
+    if (/consulta.*implante|implante.*consulta/.test(t)) return 20;
+    // Consulta de cirugía → 20 min
+    if (/consulta.*cirug|cirug.*consulta/.test(t)) return 20;
+    // Colocación de implante o cualquier conducto/endodoncia → 45 min
+    // endodont* cubre "endodóntico"/"endodontic" (normalizado pierde la c de endodoncia)
+    if (/implante|conducto|endodoncia|endodont/.test(t)) return 45;
+    return null;
 }
 
 // =============================================
@@ -646,18 +693,15 @@ function seleccionarFecha(dateStr, cardEl) {
 // =============================================
 // 4. AGENDAR TURNO
 // =============================================
-document.getElementById('agendarForm')?.addEventListener('submit', async function (e) {
+document.getElementById('agendarForm')?.addEventListener('submit', function (e) {
     e.preventDefault();
     const status = document.getElementById('agendarStatus');
-    const submitBtn = document.getElementById('submitBtn');
 
     const nombre    = document.getElementById('nombre').value.trim();
     const apellido  = document.getElementById('apellido').value.trim();
     const dni       = document.getElementById('dni').value.trim();
     const telRaw    = document.getElementById('telefono').value.replace(/\D/g, '');
-    const telefono  = '549' + telRaw;
-    const obraSocial = document.getElementById('obraSocial')?.value || '';
-    const email = document.getElementById('email')?.value.trim() || '';
+    const email     = document.getElementById('email')?.value.trim() || '';
     const tratamiento = document.getElementById('tratamiento').value.trim();
     const startTime = document.getElementById('appointmentTime').value;
 
@@ -691,10 +735,53 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         return;
     }
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Procesando...';
-    status.textContent = '';
-    status.className = 'status-msg';
+    // Armar resumen para el modal de confirmación
+    const fechaStr = slotSeleccionado.startTime
+        ? new Date(slotSeleccionado.startTime).toLocaleString('es-AR', {
+            weekday: 'long', day: 'numeric', month: 'long',
+            hour: '2-digit', minute: '2-digit', timeZone: TZ
+          })
+        : slotSeleccionado.dateLabel || '';
+    const profesional = slotSeleccionado.profesionalNombre || '';
+    const sede = slotSeleccionado.sedeName || slotSeleccionado.calendarName || sedeSeleccionada || '';
+    const durMin = getDuracionMinutos(tratamiento);
+
+    document.getElementById('preConfirmSummary').innerHTML = `
+        <div><strong>Paciente:</strong> ${escapeHtml(nombre)} ${escapeHtml(apellido)}</div>
+        <div><strong>Profesional:</strong> ${escapeHtml(profesional)}</div>
+        <div><strong>Sede:</strong> ${escapeHtml(sede)}</div>
+        <div><strong>Tratamiento:</strong> ${escapeHtml(tratamiento)}${durMin ? ` <span style="font-size:0.82rem;color:#5FA9DD;font-weight:600;">(${durMin} min)</span>` : ''}</div>
+        <div><strong>Fecha y hora:</strong> ${escapeHtml(fechaStr)}</div>
+    `;
+    document.getElementById('preConfirmStatus').textContent = '';
+    document.getElementById('preConfirmModal').classList.add('active');
+});
+
+document.getElementById('preConfirmSubmitBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('preConfirmSubmitBtn');
+    const status = document.getElementById('preConfirmStatus');
+    btn.disabled = true;
+    btn.textContent = 'Confirmando...';
+    try {
+        await ejecutarAgendamiento();
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Confirmar Turno';
+    }
+});
+
+async function ejecutarAgendamiento() {
+    const status = document.getElementById('preConfirmStatus');
+
+    const nombre    = document.getElementById('nombre').value.trim();
+    const apellido  = document.getElementById('apellido').value.trim();
+    const dni       = document.getElementById('dni').value.trim();
+    const telRaw    = document.getElementById('telefono').value.replace(/\D/g, '');
+    const telefono  = '549' + telRaw;
+    const obraSocial = document.getElementById('obraSocial')?.value || '';
+    const email     = document.getElementById('email')?.value.trim() || '';
+    const tratamiento = document.getElementById('tratamiento').value.trim();
+    const startTime = document.getElementById('appointmentTime').value;
 
     let appointmentId = null;
 
@@ -726,12 +813,19 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         if (!contactId) throw new Error('No se pudo crear el contacto.');
 
         // 2. Crear cita en GHL
+        const duracionMin = getDuracionMinutos(tratamiento);
+        const startMs = new Date(startTime).getTime();
+        const customEndTime = duracionMin
+            ? new Date(startMs + duracionMin * 60_000).toISOString()
+            : undefined;
+
         const appointmentRes = await ghlFetch('calendars/events/appointments', {
             method: 'POST',
             body: JSON.stringify({
                 calendarId: slotSeleccionado.calendarId,
                 contactId,
                 startTime,
+                ...(customEndTime ? { endTime: customEndTime } : {}),
                 title: `${nombre} ${apellido}${obraSocial ? ' - ' + obraSocial : ''} - ${tratamiento}`,
                 appointmentStatus: 'confirmed'
             })
@@ -768,6 +862,8 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
             throw new Error('No se pudo registrar el turno. Por favor reintentá en unos minutos.');
         }
 
+        cerrarModal('preConfirmModal');
+
         const successMsg = document.getElementById('successModalMsg');
         if (successMsg) {
             successMsg.textContent = email
@@ -776,7 +872,7 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         }
         document.getElementById('successModal')?.classList.add('active');
 
-        // Confirmación por email — fire-and-forget (no bloquea ni revierte el agendamiento)
+        // Confirmación por email — fire-and-forget
         if (email) {
             fetch('/api/send-confirmacion', {
                 method: 'POST',
@@ -798,16 +894,15 @@ document.getElementById('agendarForm')?.addEventListener('submit', async functio
         }
 
         document.getElementById('agendarForm').reset();
+        const tChips = document.getElementById('tratamientoChips');
+        if (tChips) tChips.innerHTML = '<p class="placeholder-text">Seleccioná primero una especialidad o profesional.</p>';
         document.getElementById('agendarFormContainer').style.display = 'none';
         disponibilidadGlobal = {};
         slotSeleccionado = null;
     } catch (e) {
         setStatus(status, e.message || 'Error al agendar.', 'var(--danger)');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Confirmar Turno';
     }
-});
+}
 
 function setStatus(el, msg, color) {
     el.textContent = msg;
@@ -1263,7 +1358,10 @@ async function confirmarReagendamiento() {
     }
 
     const startMs = new Date(startTime).getTime();
-    const endTime = new Date(startMs + slotDuration * 60_000).toISOString();
+    const tratamientoReschedule = document.getElementById('rescheduleTratamiento').value || '';
+    const duracionCustom = getDuracionMinutos(tratamientoReschedule);
+    const duracionEfectiva = duracionCustom !== null ? duracionCustom : slotDuration;
+    const endTime = new Date(startMs + duracionEfectiva * 60_000).toISOString();
 
     btn.disabled = true;
     btn.classList.add('btn-loading');
@@ -1456,7 +1554,9 @@ async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
     const formContainer = document.getElementById('agendarFormContainer');
 
     resetBookingForm();
-    if (sel) sel.innerHTML = '<option value="">Cargando tratamientos...</option>';
+    const chipsContainer = document.getElementById('tratamientoChips');
+    if (chipsContainer) chipsContainer.innerHTML = '<p class="placeholder-text">Cargando tratamientos...</p>';
+    if (sel) sel.value = '';
     formContainer.style.display = 'block';
     formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -1476,7 +1576,7 @@ async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
         });
 
         if (!especialidadProfesionalesCache.length) {
-            if (sel) sel.innerHTML = '<option value="">No hay profesionales para esta especialidad en esta sede</option>';
+            if (chipsContainer) chipsContainer.innerHTML = '<p class="placeholder-text">No hay profesionales para esta especialidad en esta sede.</p>';
             document.getElementById('datePickerContainer').innerHTML =
                 '<p class="placeholder-text" style="margin:auto;">No hay profesionales para esta especialidad en esta sede.</p>';
             return;
@@ -1497,7 +1597,7 @@ async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
             '<p class="placeholder-text" style="margin:auto;">Seleccioná un tratamiento para ver disponibilidad.</p>';
 
     } catch (e) {
-        if (sel) sel.innerHTML = '<option value="">Error al cargar tratamientos</option>';
+        if (chipsContainer) chipsContainer.innerHTML = '<p class="placeholder-text" style="color:var(--danger);">Error al cargar tratamientos.</p>';
         console.error('[cargarTratamientosPorEspecialidad]', e);
     }
 }
