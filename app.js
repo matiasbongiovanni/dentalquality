@@ -785,12 +785,16 @@ document.getElementById('agendarForm')?.addEventListener('submit', function (e) 
     const profesional = slotSeleccionado.profesionalNombre || '';
     const sede = slotSeleccionado.sedeName || slotSeleccionado.calendarName || sedeSeleccionada || '';
     const durMin = getDuracionMinutos(tratamiento);
+    const obraSocialModal = document.getElementById('obraSocial')?.value || '';
+    const planModal = document.getElementById('planObraSocial')?.value.trim() || '';
+    const obraSocialModalStr = obraSocialModal && planModal ? `${obraSocialModal} — Plan ${planModal}` : obraSocialModal;
 
     document.getElementById('preConfirmSummary').innerHTML = `
         <div><strong>Paciente:</strong> ${escapeHtml(nombre)} ${escapeHtml(apellido)}</div>
         <div><strong>Profesional:</strong> ${escapeHtml(profesional)}</div>
         <div><strong>Sede:</strong> ${escapeHtml(sede)}</div>
         <div><strong>Tratamiento:</strong> ${escapeHtml(tratamiento)}${durMin ? ` <span style="font-size:0.82rem;color:#5FA9DD;font-weight:600;">(${durMin} min)</span>` : ''}</div>
+        ${obraSocialModalStr ? `<div><strong>Obra Social:</strong> ${escapeHtml(obraSocialModalStr)}</div>` : ''}
         <div><strong>Fecha y hora:</strong> ${escapeHtml(fechaStr)}</div>
     `;
     document.getElementById('preConfirmStatus').textContent = '';
@@ -819,6 +823,8 @@ async function ejecutarAgendamiento() {
     const telRaw    = document.getElementById('telefono').value.replace(/\D/g, '');
     const telefono  = '549' + telRaw;
     const obraSocial = document.getElementById('obraSocial')?.value || '';
+    const planOS     = document.getElementById('planObraSocial')?.value.trim() || '';
+    const obraSocialConPlan = obraSocial && planOS ? `${obraSocial} - Plan ${planOS}` : obraSocial;
     const email     = document.getElementById('email')?.value.trim() || '';
     const tratamiento = document.getElementById('tratamiento').value.trim();
     const startTime = document.getElementById('appointmentTime').value;
@@ -890,7 +896,7 @@ async function ejecutarAgendamiento() {
                     contactId,
                     startTime,
                     ...(customEndTime ? { endTime: customEndTime } : {}),
-                    title: `${nombre} ${apellido}${obraSocial ? ' - ' + obraSocial : ''} - ${tratamiento}`,
+                    title: `${nombre} ${apellido}${obraSocialConPlan ? ' - ' + obraSocialConPlan : ''} - ${tratamiento}`,
                     appointmentStatus: 'confirmed'
                 })
             });
@@ -914,7 +920,7 @@ async function ejecutarAgendamiento() {
                 full_name: `${nombre} ${apellido}`,
                 phone: telefono,
                 DNI: dni,
-                'Obra Social': obraSocial,
+                'Obra Social': obraSocialConPlan,
                 Tratamiento: tratamiento,
                 calendar: {
                     appointmentId,
@@ -955,7 +961,7 @@ async function ejecutarAgendamiento() {
                     full_name: `${nombre} ${apellido}`,
                     phone: telefono,
                     Tratamiento: tratamiento,
-                    'Obra Social': obraSocial,
+                    'Obra Social': obraSocialConPlan,
                     profesional: slotSeleccionado?.profesionalNombre || '',
                     sede: slotSeleccionado?.sedeName || slotSeleccionado?.calendarName || '',
                     startTime,
