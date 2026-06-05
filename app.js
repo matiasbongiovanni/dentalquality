@@ -236,7 +236,7 @@ function renderEspecialidadCards() {
                     '<p class="placeholder-text" style="margin:auto;">Primero seleccioná una sede.</p>';
                 return;
             }
-            cargarTratamientosPorEspecialidad(esp.searchKeys || [esp.searchKey], sedeSeleccionada);
+            cargarTratamientosPorEspecialidad(esp.searchKeys || [esp.searchKey], sedeSeleccionada, esp.tratamientos);
         };
         grid.appendChild(card);
     });
@@ -1620,7 +1620,7 @@ if (telInput) {
 // =============================================
 // CARGAR TRATAMIENTOS DESDE SUPABASE (por especialidad)
 // =============================================
-async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
+async function cargarTratamientosPorEspecialidad(searchKeys, sede, tratamientosEspecialidad = []) {
     const hidden = document.getElementById('tratamiento');
     const tSel = document.getElementById('tratamientoSelect');
     const formContainer = document.getElementById('agendarFormContainer');
@@ -1653,16 +1653,12 @@ async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
             return;
         }
 
-        const tratamientosSet = new Set();
-        especialidadProfesionalesCache.forEach(p => {
-            normalizarTratamientos(p.tratamientos).forEach(t => tratamientosSet.add(t));
-        });
-
-        const tratamientos = [...tratamientosSet].sort();
-        poblarTratamientos(tratamientos.length
-            ? tratamientos
-            : ['Consulta general', 'Control / Revisación', 'Urgencia']
-        );
+        // Usar los tratamientos definidos en ESPECIALIDADES; evita mezclar tratamientos
+        // de otras especialidades del mismo profesional (ej. Valenzuela tiene ATM + Implantes)
+        const tratamientos = tratamientosEspecialidad.length
+            ? tratamientosEspecialidad
+            : ['Consulta general', 'Control / Revisación', 'Urgencia'];
+        poblarTratamientos(tratamientos);
 
         document.getElementById('datePickerContainer').innerHTML =
             '<p class="placeholder-text" style="margin:auto;">Seleccioná un tratamiento para ver disponibilidad.</p>';
