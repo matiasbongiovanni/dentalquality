@@ -1713,15 +1713,18 @@ document.getElementById('tratamiento')?.addEventListener('change', function () {
             '<p class="placeholder-text" style="margin:auto;">Seleccioná un tratamiento para ver disponibilidad.</p>';
         return;
     }
+    // Los tratamientos vienen de ESPECIALIDADES (curados), no necesariamente del texto de la DB.
+    // Si no matchean exacto, usamos todos los profs de la especialidad (ya filtrados por searchKey).
     const profsConTratamiento = especialidadProfesionalesCache.filter(p =>
         normalizarTratamientos(p.tratamientos).includes(tratamientoElegido)
     );
-    if (!profsConTratamiento.length) {
+    const profsAUsar = profsConTratamiento.length ? profsConTratamiento : especialidadProfesionalesCache;
+    if (!profsAUsar.length) {
         document.getElementById('datePickerContainer').innerHTML =
             '<p class="placeholder-text" style="margin:auto;">No hay disponibilidad para ese tratamiento en esta sede. Contactanos por WhatsApp.</p>';
         return;
     }
-    cargarSlotsDesdeProfs(profsConTratamiento);
+    cargarSlotsDesdeProfs(profsAUsar);
 });
 
 // =============================================
