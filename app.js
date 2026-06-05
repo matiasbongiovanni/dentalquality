@@ -705,8 +705,13 @@ document.getElementById('agendarForm')?.addEventListener('submit', function (e) 
     const startTime = document.getElementById('appointmentTime').value;
 
     // Validaciones
+    const obraSocialCheck = document.getElementById('obraSocial')?.value || '';
     if (!nombre || !apellido || !dni || !telRaw || !email) {
         setStatus(status, 'Completá todos los campos obligatorios.');
+        return;
+    }
+    if (!obraSocialCheck) {
+        setStatus(status, 'Seleccioná tu obra social o prepaga.');
         return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -785,6 +790,28 @@ async function ejecutarAgendamiento() {
     let appointmentId = null;
 
     try {
+        // 0. Pre-flight: verificar que el slot sigue disponible (anti-solapamiento)
+        try {
+            const startMs = new Date(startTime).getTime();
+            const endMs = startMs + 24 * 60 * 60 * 1000;
+            const freshSlots = await ghlFetch(
+                `calendars/${slotSeleccionado.calendarId}/free-slots?startDate=${startMs}&endDate=${endMs}&timezone=${encodeURIComponent(TZ)}`
+            );
+            const dayKey = startTime.slice(0, 10);
+            const dayData = freshSlots?.slots?.[dayKey] || freshSlots?.data?.[dayKey] || freshSlots?.[dayKey];
+            const slotArr = dayData?.slots || (Array.isArray(dayData) ? dayData : []);
+            const stillFree = slotArr.some(s => {
+                const st = s.startTime || s.time || s;
+                return typeof st === 'string' && new Date(st).getTime() === startMs;
+            });
+            if (!stillFree) {
+                throw new Error('Ese horario se ocupó. Elegí otro disponible.');
+            }
+        } catch (e) {
+            if (/ocupó/i.test(e.message)) throw e;
+            // Si falla el check (red, etc.) dejamos continuar para no bloquear innecesariamente
+        }
+
         // 1. Buscar o crear contacto en GHL
         let contactId;
         try {
@@ -818,17 +845,26 @@ async function ejecutarAgendamiento() {
             ? new Date(startMs + duracionMin * 60_000).toISOString()
             : undefined;
 
-        const appointmentRes = await ghlFetch('calendars/events/appointments', {
-            method: 'POST',
-            body: JSON.stringify({
-                calendarId: slotSeleccionado.calendarId,
-                contactId,
-                startTime,
-                ...(customEndTime ? { endTime: customEndTime } : {}),
-                title: `${nombre} ${apellido}${obraSocial ? ' - ' + obraSocial : ''} - ${tratamiento}`,
-                appointmentStatus: 'confirmed'
-            })
-        });
+        let appointmentRes;
+        try {
+            appointmentRes = await ghlFetch('calendars/events/appointments', {
+                method: 'POST',
+                body: JSON.stringify({
+                    calendarId: slotSeleccionado.calendarId,
+                    contactId,
+                    startTime,
+                    ...(customEndTime ? { endTime: customEndTime } : {}),
+                    title: `${nombre} ${apellido}${obraSocial ? ' - ' + obraSocial : ''} - ${tratamiento}`,
+                    appointmentStatus: 'confirmed'
+                })
+            });
+        } catch (ghlErr) {
+            const msg = ghlErr.message || '';
+            if (/conflict|409|422|not available|unavailable|ocupad|slot/i.test(msg)) {
+                throw new Error('Ese horario se ocupó mientras completabas el formulario. Elegí otro disponible.');
+            }
+            throw ghlErr;
+        }
         appointmentId = appointmentRes?.appointment?.id || appointmentRes?.id;
         if (!appointmentId) throw new Error('GHL no devolvió el ID del turno.');
 
