@@ -255,30 +255,34 @@ function normalizarTratamientos(raw) {
 }
 
 function poblarTratamientos(lista) {
-    const container = document.getElementById('tratamientoChips');
+    const sel = document.getElementById('tratamientoSelect');
     const hidden = document.getElementById('tratamiento');
-    if (!container || !hidden) return;
+    if (!sel || !hidden) return;
     hidden.value = '';
+    sel.innerHTML = '';
     if (!lista || lista.length === 0) {
-        container.innerHTML = '<p class="placeholder-text" style="color:rgba(23, 56, 88, 0.65);">No hay tratamientos disponibles.</p>';
+        sel.innerHTML = '<option value="">No hay tratamientos disponibles</option>';
+        sel.disabled = true;
         return;
     }
-    container.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Seleccioná el tratamiento';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    sel.appendChild(placeholder);
     lista.forEach(t => {
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'tratamiento-chip';
-        chip.dataset.value = t;
+        const opt = document.createElement('option');
+        opt.value = t;
         const durMin = getDuracionMinutos(t);
-        chip.innerHTML = `<span class="chip-label">${escapeHtml(t)}</span>${durMin ? `<span class="chip-badge">${durMin} min</span>` : ''}`;
-        chip.addEventListener('click', () => {
-            container.querySelectorAll('.tratamiento-chip').forEach(c => c.classList.remove('selected'));
-            chip.classList.add('selected');
-            hidden.value = t;
-            hidden.dispatchEvent(new Event('change'));
-        });
-        container.appendChild(chip);
+        opt.textContent = durMin ? `${t} (${durMin} min)` : t;
+        sel.appendChild(opt);
     });
+    sel.disabled = false;
+    sel.onchange = () => {
+        hidden.value = sel.value;
+        hidden.dispatchEvent(new Event('change'));
+    };
 }
 
 function resetBookingForm() {
@@ -289,8 +293,8 @@ function resetBookingForm() {
     document.getElementById('appointmentTime').value = '';
     document.getElementById('timeSlotsContainer').innerHTML = '<p class="placeholder-text">Seleccioná una fecha para ver horarios.</p>';
     document.getElementById('datePickerContainer').innerHTML = '<p class="placeholder-text">Cargando agenda...</p>';
-    const tChips = document.getElementById('tratamientoChips');
-    if (tChips) tChips.innerHTML = '<p class="placeholder-text">Seleccioná primero una especialidad o profesional.</p>';
+    const tSel = document.getElementById('tratamientoSelect');
+    if (tSel) { tSel.innerHTML = '<option value="">Seleccioná primero una especialidad o profesional</option>'; tSel.disabled = true; }
     const tHidden = document.getElementById('tratamiento');
     if (tHidden) tHidden.value = '';
 }
@@ -961,8 +965,8 @@ async function ejecutarAgendamiento() {
         }
 
         document.getElementById('agendarForm').reset();
-        const tChips = document.getElementById('tratamientoChips');
-        if (tChips) tChips.innerHTML = '<p class="placeholder-text">Seleccioná primero una especialidad o profesional.</p>';
+        const tSelPost = document.getElementById('tratamientoSelect');
+        if (tSelPost) { tSelPost.innerHTML = '<option value="">Seleccioná primero una especialidad o profesional</option>'; tSelPost.disabled = true; }
         document.getElementById('agendarFormContainer').style.display = 'none';
         disponibilidadGlobal = {};
         slotSeleccionado = null;
@@ -1617,13 +1621,13 @@ if (telInput) {
 // CARGAR TRATAMIENTOS DESDE SUPABASE (por especialidad)
 // =============================================
 async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
-    const sel = document.getElementById('tratamiento');
+    const hidden = document.getElementById('tratamiento');
+    const tSel = document.getElementById('tratamientoSelect');
     const formContainer = document.getElementById('agendarFormContainer');
 
     resetBookingForm();
-    const chipsContainer = document.getElementById('tratamientoChips');
-    if (chipsContainer) chipsContainer.innerHTML = '<p class="placeholder-text">Cargando tratamientos...</p>';
-    if (sel) sel.value = '';
+    if (tSel) { tSel.innerHTML = '<option value="">Cargando tratamientos...</option>'; tSel.disabled = true; }
+    if (hidden) hidden.value = '';
     formContainer.style.display = 'block';
     formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -1643,7 +1647,7 @@ async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
         });
 
         if (!especialidadProfesionalesCache.length) {
-            if (chipsContainer) chipsContainer.innerHTML = '<p class="placeholder-text">No hay profesionales para esta especialidad en esta sede.</p>';
+            if (tSel) { tSel.innerHTML = '<option value="">No hay profesionales para esta especialidad en esta sede</option>'; tSel.disabled = true; }
             document.getElementById('datePickerContainer').innerHTML =
                 '<p class="placeholder-text" style="margin:auto;">No hay profesionales para esta especialidad en esta sede.</p>';
             return;
@@ -1664,7 +1668,7 @@ async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
             '<p class="placeholder-text" style="margin:auto;">Seleccioná un tratamiento para ver disponibilidad.</p>';
 
     } catch (e) {
-        if (chipsContainer) chipsContainer.innerHTML = '<p class="placeholder-text" style="color:var(--danger);">Error al cargar tratamientos.</p>';
+        if (tSel) { tSel.innerHTML = '<option value="">Error al cargar tratamientos</option>'; tSel.disabled = true; }
         console.error('[cargarTratamientosPorEspecialidad]', e);
     }
 }
