@@ -20,14 +20,14 @@ const DURATION_CASES = [
     { tratamiento: 'Colocación de implante',                  expected: 45 },
     { tratamiento: 'implantes',                               expected: 45 },
     { tratamiento: 'Corona sobre implante',                   expected: 45 },
-    // consulta de implante → 20 min (debe ir antes del match genérico)
-    { tratamiento: 'Consulta de implantes',                   expected: 20 },
-    { tratamiento: 'consulta de implante',                    expected: 20 },
-    { tratamiento: 'implante consulta inicial',               expected: 20 },
-    // consulta de cirugía → 20 min
-    { tratamiento: 'Consulta de cirugía',                     expected: 20 },
-    { tratamiento: 'cirugía consulta inicial',                expected: 20 },
-    { tratamiento: 'Cirugía (solo consulta)',                  expected: 20 },
+    // consulta de implante → 15 min (debe ir antes del match genérico)
+    { tratamiento: 'Consulta de implantes',                   expected: 15 },
+    { tratamiento: 'consulta de implante',                    expected: 15 },
+    { tratamiento: 'implante consulta inicial',               expected: 15 },
+    // consulta de cirugía → 15 min
+    { tratamiento: 'Consulta de cirugía',                     expected: 15 },
+    { tratamiento: 'cirugía consulta inicial',                expected: 15 },
+    { tratamiento: 'Cirugía (solo consulta)',                  expected: 15 },
     // cirugía sin consulta → null (usa slot del calendario)
     { tratamiento: 'Cirugía de extracción',                   expected: null },
     // otros → null (usa slotDuration del calendario)
@@ -132,14 +132,14 @@ test.describe('POST creación de turno — endTime según tratamiento', () => {
         }
     });
 
-    test('Consulta de implantes — endTime = startTime + 20 min', async ({ page }) => {
+    test('Consulta de implantes — endTime = startTime + 15 min', async ({ page }) => {
         await setupMocks(page, 'Consulta de implantes');
         await page.goto('/');
         await fillAndSubmitForm(page, 'Consulta de implantes');
         if (capturedGhlBody && capturedGhlBody.startTime && capturedGhlBody.endTime) {
             const start = new Date(capturedGhlBody.startTime).getTime();
             const end   = new Date(capturedGhlBody.endTime).getTime();
-            expect(end - start).toBe(20 * 60 * 1000);
+            expect(end - start).toBe(15 * 60 * 1000);
         }
     });
 

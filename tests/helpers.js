@@ -1,7 +1,26 @@
 const PROFESIONALES_MOCK = [
-    { profesional: 'Dra. López', sede: 'Lanus', calendar_id: 'cal_lanus_001', especialidades: '- odontolog' },
-    { profesional: 'Dr. García', sede: 'Lomas', calendar_id: 'cal_lomas_001', especialidades: '- estet' },
+    { profesional: 'Dra. López',          sede: 'Lanus', calendar_id: 'cal_lanus_001',    especialidades: '- odontolog',                                      tratamientos: 'Limpieza y profilaxis, Consulta general, Obturación (caries)' },
+    { profesional: 'Dr. García',          sede: 'Lomas', calendar_id: 'cal_lomas_001',    especialidades: '- estet',                                           tratamientos: 'Reconstrucción, Carillas' },
+    { profesional: 'Dra. Muthular Mock',  sede: 'Lanus', calendar_id: 'cal_endo_001',     especialidades: 'Endodoncia',                                        tratamientos: 'Tratamiento de conducto' },
+    { profesional: 'Dra. Sanguineri Mock',sede: 'Lanus', calendar_id: 'cal_impl_001',     especialidades: 'Ortodoncia, Ortopedia, Alineadores, Implantes, Prótesis', tratamientos: 'Brackets, alineadores, implantes, rehabilitaciones protésicas completas' },
 ];
+
+// Mock de profesional para tests de duración
+const PROFESIONAL_ENDODONCIA_MOCK = {
+    profesional: 'Dra. Muthular Mock',
+    sede: 'Lanus',
+    calendar_id: 'cal_endo_001',
+    especialidades: 'Endodoncia',
+    tratamientos: 'Tratamiento de conducto'
+};
+
+const PROFESIONAL_IMPLANTE_MOCK = {
+    profesional: 'Dr. Valenzuela Mock',
+    sede: 'Lanus',
+    calendar_id: 'cal_impl_001',
+    especialidades: 'Ortodoncia, Ortopedia, ATM, Implantes, Prótesis, Alineadores',
+    tratamientos: 'Brackets, alineadores, implantes, consulta de implantes, coronas'
+};
 
 function buildSlotsMock() {
     const tomorrow = new Date();
@@ -24,4 +43,4 @@ const TEST_PATIENT = {
     obraSocial: '',
 };
 
-module.exports = { PROFESIONALES_MOCK, buildSlotsMock, TEST_PATIENT };
+module.exports = { PROFESIONALES_MOCK, PROFESIONAL_ENDODONCIA_MOCK, PROFESIONAL_IMPLANTE_MOCK, buildSlotsMock, TEST_PATIENT };

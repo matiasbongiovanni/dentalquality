@@ -269,10 +269,9 @@ function resetBookingForm() {
 // =============================================
 function getDuracionMinutos(tratamiento) {
     const t = (tratamiento || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    // Consulta de implantes → 20 min (debe ir antes del match genérico de implante)
-    if (/consulta.*implante|implante.*consulta/.test(t)) return 20;
-    // Consulta de cirugía → 20 min
-    if (/consulta.*cirug|cirug.*consulta/.test(t)) return 20;
+    // Consulta de implantes o cirugía → 15 min (debe ir antes del match genérico de implante)
+    if (/consulta.*implante|implante.*consulta/.test(t)) return 15;
+    if (/consulta.*cirug|cirug.*consulta/.test(t)) return 15;
     // Colocación de implante o cualquier conducto/endodoncia → 45 min
     // endodont* cubre "endodóntico"/"endodontic" (normalizado pierde la c de endodoncia)
     if (/implante|conducto|endodoncia|endodont/.test(t)) return 45;
