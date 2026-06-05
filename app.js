@@ -13,8 +13,40 @@ async function initConfig() {
         SUPABASE_URL = cfg.SUPABASE_URL || '';
         const key = cfg.SUPABASE_ANON_KEY || '';
         SUPABASE_HEADERS = { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' };
+        await cargarObrasSociales();
     } catch (_) {
         console.warn('[Config] No se pudo cargar configuración del servidor');
+    }
+}
+
+const OSDE_PLANES = ['210', '310', '410', '450', '510', '610'];
+
+async function cargarObrasSociales() {
+    const sel = document.getElementById('obraSocial');
+    if (!sel) return;
+    try {
+        const data = await supaFetch('/obras_sociales?select=nombre&activa=eq.true&order=nombre.asc');
+        const entries = [];
+        for (const row of data) {
+            const nombre = (row.nombre || '').trim();
+            if (!nombre) continue;
+            if (nombre.toLowerCase() === 'osde') {
+                for (const plan of OSDE_PLANES) {
+                    entries.push(`OSDE ${plan}`);
+                }
+            } else {
+                entries.push(nombre.charAt(0).toUpperCase() + nombre.slice(1));
+            }
+        }
+        sel.innerHTML = '<option value="" disabled selected>Seleccioná tu obra social *</option>';
+        for (const label of entries) {
+            const opt = document.createElement('option');
+            opt.value = label;
+            opt.textContent = label;
+            sel.appendChild(opt);
+        }
+    } catch (e) {
+        console.warn('[ObrasSociales] No se pudo cargar desde Supabase:', e.message);
     }
 }
 
