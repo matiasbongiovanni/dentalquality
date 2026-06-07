@@ -115,7 +115,7 @@ const SVG_ICONS = {
 };
 
 // =============================================
-// ESPECIALIDADES (hardcoded)
+// ESPECIALIDADES — categorías de búsqueda (searchKeys consultan la DB; tratamientos vienen de Supabase)
 // =============================================
 const ESPECIALIDADES = [
     {
@@ -123,50 +123,42 @@ const ESPECIALIDADES = [
         label: 'Odontología General',
         desc: 'Consultas, limpiezas y caries',
         searchKey: 'odontolog',
-        tratamientos: ['Consulta / Revisación general', 'Limpieza y profilaxis', 'Urgencia odontológica', 'Extracción simple', 'Obturación (caries)', 'Selladores preventivos', 'Fluoruración']
     },
     {
         id: 'estetica-dental',
         label: 'Estética Dental',
         desc: 'Reconstrucción, incrustaciones, carillas y coronas',
         searchKey: 'stética',
-        tratamientos: ['Reconstrucción', 'Incrustación', 'Carillas', 'Coronas']
     },
     {
         id: 'ortodoncia-alineadores',
         label: 'Ortodoncia y Alineadores',
         desc: 'Brackets, Invisalign y corrección dental',
         searchKey: 'ortodon',
-        tratamientos: ['Consulta inicial de ortodoncia', 'Colocación de brackets', 'Control de ortodoncia', 'Alineadores (Invisalign)', 'Retención post-tratamiento']
     },
     {
         id: 'implantes-protesis',
         label: 'Implantes y Prótesis',
         desc: 'Implantes, coronas y prótesis dentales',
-        searchKey: 'implant',
         searchKeys: ['implant', 'protesis', 'prótesis'],
-        tratamientos: ['Consulta de implantes', 'Colocación de implante', 'Control post-operatorio', 'Corona sobre implante', 'Consulta de prótesis', 'Prótesis fija', 'Prótesis removible', 'Prótesis total']
     },
     {
         id: 'atm-bruxismo',
         label: 'ATM · Bruxismo',
         desc: 'Dolor mandibular y apretamiento dental',
         searchKey: 'atm',
-        tratamientos: ['Consulta ATM', 'Diagnóstico de bruxismo', 'Placa miorelajante', 'Control de placa', 'Tratamiento de ATM']
     },
     {
         id: 'odontopediatria',
         label: 'Odontopediatría y Ortopediatría',
         desc: 'Atención dental y ortopédica para niños',
         searchKey: 'pediatr',
-        tratamientos: ['Control pediátrico', 'Urgencia pediátrica', 'Selladores preventivos (niños)', 'Fluoruración infantil', 'Aparatología removible', 'Ortopedia maxilar']
     },
     {
         id: 'endodoncia-conductos',
         label: 'Endodoncia y Conductos',
         desc: 'Tratamientos de conducto y endodoncia',
         searchKeys: ['endodoncia', 'conducto'],
-        tratamientos: []
     },
 ];
 
@@ -236,12 +228,16 @@ function renderEspecialidadCards() {
                     '<p class="placeholder-text" style="margin:auto;">Primero seleccioná una sede.</p>';
                 return;
             }
-            cargarTratamientosPorEspecialidad(esp.searchKeys || [esp.searchKey], sedeSeleccionada, esp.tratamientos);
+            cargarTratamientosPorEspecialidad(esp.searchKeys || [esp.searchKey], sedeSeleccionada);
         };
         grid.appendChild(card);
     });
     container.innerHTML = '';
     container.appendChild(grid);
+}
+
+function normStr(s) {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
 // Normaliza tratamientos: acepta array (jsonb) o string de texto (csv / newlines)
@@ -630,7 +626,8 @@ function parsearSlots(raw, prof) {
         const slots = dayData?.slots || dayData;
         if (!Array.isArray(slots)) return;
         slots.forEach(slot => {
-            const isoRaw = typeof slot === 'string' ? slot : (slot.startTime || slot);
+            const isoRaw = typeof slot === 'string' ? slot : (slot.startTime || slot.time || null);
+            if (!isoRaw || typeof isoRaw !== 'string') return;
             const iso = normalizarIsoArt(isoRaw);
             const d = new Date(iso);
             if (!isNaN(d.getTime()) && d > new Date()) {
@@ -704,8 +701,9 @@ function seleccionarFecha(dateStr, cardEl) {
     const seen = new Set();
     const parsed = slotsData
         .filter(slot => {
-            if (seen.has(slot.iso)) return false;
-            seen.add(slot.iso);
+            const key = `${slot.iso}|${slot.calendarId}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
             return true;
         })
         .sort((a, b) => a.d - b.d);
@@ -1626,7 +1624,7 @@ if (telInput) {
 // =============================================
 // CARGAR TRATAMIENTOS DESDE SUPABASE (por especialidad)
 // =============================================
-async function cargarTratamientosPorEspecialidad(searchKeys, sede, tratamientosEspecialidad = []) {
+async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
     const hidden = document.getElementById('tratamiento');
     const tSel = document.getElementById('tratamientoSelect');
     const formContainer = document.getElementById('agendarFormContainer');
@@ -1659,12 +1657,19 @@ async function cargarTratamientosPorEspecialidad(searchKeys, sede, tratamientosE
             return;
         }
 
-        // Usar los tratamientos definidos en ESPECIALIDADES; evita mezclar tratamientos
-        // de otras especialidades del mismo profesional (ej. Valenzuela tiene ATM + Implantes)
-        const tratamientos = tratamientosEspecialidad.length
-            ? tratamientosEspecialidad
-            : ['Consulta general', 'Control / Revisación', 'Urgencia'];
-        poblarTratamientos(tratamientos);
+        // Tratamientos provienen de la DB (unión deduplicada de todos los profesionales de la especialidad)
+        const allTratamientos = [...new Set(
+            especialidadProfesionalesCache.flatMap(p => normalizarTratamientos(p.tratamientos))
+        )].filter(Boolean);
+
+        if (!allTratamientos.length) {
+            if (tSel) { tSel.innerHTML = '<option value="">Sin tratamientos configurados para esta especialidad</option>'; tSel.disabled = true; }
+            document.getElementById('datePickerContainer').innerHTML =
+                '<p class="placeholder-text" style="margin:auto;">Sin tratamientos disponibles. Contactanos por WhatsApp.</p>';
+            return;
+        }
+
+        poblarTratamientos(allTratamientos);
 
         document.getElementById('datePickerContainer').innerHTML =
             '<p class="placeholder-text" style="margin:auto;">Seleccioná un tratamiento para ver disponibilidad.</p>';
@@ -1719,10 +1724,9 @@ document.getElementById('tratamiento')?.addEventListener('change', function () {
             '<p class="placeholder-text" style="margin:auto;">Seleccioná un tratamiento para ver disponibilidad.</p>';
         return;
     }
-    // Los tratamientos vienen de ESPECIALIDADES (curados), no necesariamente del texto de la DB.
-    // Si no matchean exacto, usamos todos los profs de la especialidad (ya filtrados por searchKey).
+    const tratamientoNorm = normStr(tratamientoElegido);
     const profsConTratamiento = especialidadProfesionalesCache.filter(p =>
-        normalizarTratamientos(p.tratamientos).includes(tratamientoElegido)
+        normalizarTratamientos(p.tratamientos).some(t => normStr(t) === tratamientoNorm)
     );
     const profsAUsar = profsConTratamiento.length ? profsConTratamiento : especialidadProfesionalesCache;
     if (!profsAUsar.length) {
