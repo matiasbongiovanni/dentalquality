@@ -19,7 +19,7 @@ async function initConfig() {
     }
 }
 
-const OSDE_PLANES = ['210', '310', '410', '450', '510', '610'];
+const OSDE_PLANES = ['310', '410', '450', '510', '610'];
 
 async function cargarObrasSociales() {
     const sel = document.getElementById('obraSocial');
@@ -250,7 +250,7 @@ function normalizarTratamientos(raw) {
         .filter(t => t.length > 0);
 }
 
-function poblarTratamientos(lista) {
+function poblarTratamientos(lista, profesionalNombre = '') {
     const sel = document.getElementById('tratamientoSelect');
     const hidden = document.getElementById('tratamiento');
     if (!sel || !hidden) return;
@@ -270,7 +270,7 @@ function poblarTratamientos(lista) {
     lista.forEach(t => {
         const opt = document.createElement('option');
         opt.value = t;
-        const durMin = getDuracionMinutos(t);
+        const durMin = getDuracionMinutos(t, profesionalNombre);
         opt.textContent = durMin ? `${t} (${durMin} min)` : t;
         sel.appendChild(opt);
     });
@@ -299,14 +299,17 @@ function resetBookingForm() {
 // DURACIÓN POR TRATAMIENTO
 // Retorna minutos para tratamientos específicos; null = usar slotDuration del calendario
 // =============================================
-function getDuracionMinutos(tratamiento) {
+function getDuracionMinutos(tratamiento, profesionalNombre = '') {
     const t = (tratamiento || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const p = (profesionalNombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     // Consulta de implantes o cirugía → 15 min (debe ir antes del match genérico de implante)
     if (/consulta.*implante|implante.*consulta/.test(t)) return 15;
     if (/consulta.*cirug|cirug.*consulta/.test(t)) return 15;
-    // Colocación de implante o cualquier conducto/endodoncia → 45 min
-    // endodont* cubre "endodóntico"/"endodontic" (normalizado pierde la c de endodoncia)
-    if (/implante|conducto|endodoncia|endodont/.test(t)) return 45;
+    // Conducto/endodoncia → 45 min SOLO para Biagi; resto → 15 min
+    // endodont* cubre "endodóntico"/"endodontic" (normalizado pierde la tilde)
+    if (/conducto|endodoncia|endodont/.test(t)) return /biagi/.test(p) ? 45 : 15;
+    // Colocación de implante → 45 min
+    if (/implante/.test(t)) return 45;
     return null;
 }
 
@@ -474,7 +477,7 @@ function onProfesionalChange() {
 function onProfesionalCardSelected(prof) {
     const parsed = normalizarTratamientos(prof.tratamientos);
     const lista = parsed.length ? parsed : ['Consulta general', 'Control / Revisación', 'Urgencia'];
-    poblarTratamientos(lista);
+    poblarTratamientos(lista, prof.profesional || '');
     cargarSlotsCalendar(prof.calendar_id);
 }
 
@@ -782,7 +785,7 @@ document.getElementById('agendarForm')?.addEventListener('submit', function (e) 
         : slotSeleccionado.dateLabel || '';
     const profesional = slotSeleccionado.profesionalNombre || '';
     const sede = slotSeleccionado.sedeName || slotSeleccionado.calendarName || sedeSeleccionada || '';
-    const durMin = getDuracionMinutos(tratamiento);
+    const durMin = getDuracionMinutos(tratamiento, profesional);
     const obraSocialModal = document.getElementById('obraSocial')?.value || '';
     const planModal = document.getElementById('planObraSocial')?.value.trim() || '';
     const obraSocialModalStr = obraSocialModal && planModal ? `${obraSocialModal} — Plan ${planModal}` : obraSocialModal;
@@ -879,7 +882,7 @@ async function ejecutarAgendamiento() {
         if (!contactId) throw new Error('No se pudo crear el contacto.');
 
         // 2. Crear cita en GHL
-        const duracionMin = getDuracionMinutos(tratamiento);
+        const duracionMin = getDuracionMinutos(tratamiento, slotSeleccionado?.profesionalNombre || '');
         const startMs = new Date(startTime).getTime();
         const customEndTime = duracionMin
             ? new Date(startMs + duracionMin * 60_000).toISOString()
@@ -1434,7 +1437,7 @@ async function confirmarReagendamiento() {
 
     const startMs = new Date(startTime).getTime();
     const tratamientoReschedule = document.getElementById('rescheduleTratamiento').value || '';
-    const duracionCustom = getDuracionMinutos(tratamientoReschedule);
+    const duracionCustom = getDuracionMinutos(tratamientoReschedule, document.getElementById('rescheduleProfesional')?.value || '');
     const duracionEfectiva = duracionCustom !== null ? duracionCustom : slotDuration;
     const endTime = new Date(startMs + duracionEfectiva * 60_000).toISOString();
 
