@@ -162,6 +162,72 @@ const ESPECIALIDADES = [
     },
 ];
 
+// =============================================
+// OVERRIDE CSV CLÍNICA (2026-06-11)
+// Datos oficiales aplicados desde la WEB, sin tocar la DB de Supabase.
+// Clave = calendar_id. Reemplaza especialidades + tratamientos del listado oficial.
+// PROF_REMOVIDOS = profesionales que la clínica pidió sacar del listado.
+// =============================================
+const PROF_REMOVIDOS = new Set([
+    'nQ7IXhCKF8Wzc4RIhx5P', // Dra. Muthular Milagros (Lanús) — "SACAR"
+]);
+
+const PROF_OVERRIDES = {
+    // Lomas
+    '5ytCBjhAChRiz1ensnPn': { especialidades: 'Endodoncia, Incrustaciones', tratamientos: 'Tratamiento de conducto, retratamiento endodóntico, restauraciones post-endodoncia, incrustaciones estéticas o metálicas, Corona' }, // Biagi
+    '0n6XtIjxoeBaPi6hqfgG': { especialidades: 'Odontología general, Prótesis', tratamientos: 'Controles generales, limpiezas, obturaciones, extracciones simples, coronas, prótesis fija y removible, placas miorrelajantes, Prótesis y Corona' }, // Motta
+    'Dyu7zKC6phLyMdfnjShs': { especialidades: 'Ortodoncia, Ortopedia, ATM, Implantes, Prótesis, Alineadores', tratamientos: 'consulta x ortodoncia u ortopedia, ajuste mensual de ortodoncia, ajuste mensual de ortopedia (removibles), consulta x ATM, consulta x implantes, consulta x cirugias complejas, consulta x protesis fija o removible' }, // Valenzuela Lomas
+    'SgbpPdcPphpH7ZbkTFbc': { especialidades: 'Odontología general, Estética dental, Ortodoncia, Ortopedia, Prótesis, Incrustaciones', tratamientos: 'Ortodoncia, aparatología ortopédica, obturaciones, prótesis fija/removible, incrustaciones, rehabilitaciones estéticas, reposición de brackets, placas miorrelajantes, Ortodoncia/Ortopedia' }, // Aquino
+    'Zq7100ll92Z4E0nz5KjK': { especialidades: 'Odontopediatría', tratamientos: 'Atención infantil, motivación, flúor, sellantes, operatoria en niños, extracciones de temporales, sellado de fisuras, prótesis para niños' }, // Cerpa
+    'opojJgc5t7AP4qyI45W4': { especialidades: 'Endodoncia, Prótesis', tratamientos: 'Tratamientos de conducto, coronas, prótesis fija o removible, Prótesis y Corona' }, // Obregón
+    'SUg5Zcw8yX5xFUmT6z8j': { especialidades: 'Odontología general, Ortodoncia', tratamientos: 'Controles generales, limpiezas, ortodoncia con brackets, obturaciones, reposición de brackets' }, // Peñafiel
+    'USfwitDKerLMat4LHTGv': { especialidades: 'Odontología general, Ortodoncia, Ortopedia', tratamientos: 'consulta general niños o adultos, consulta x ortodoncia u ortopedia, ajuste mensual de ortodoncia u ortopedia' }, // Ponce Lomas
+    'HlKSamINK5hVjaPGQ0bf': { especialidades: 'Odontopediatría, Ortopedia', tratamientos: 'Atención infantil, aparatología ortopédica, flúor, sellantes, prevención, extracciones de piezas temporales, prótesis para niños' }, // Ramírez
+    'm0N9lnZ8bDodxxuM7Dmb': { especialidades: 'Odontología general, Estética dental', tratamientos: 'Consulta general de adultos, consulta general de niños, consulta x protesis x ioma, consulta protesis particular o reintegro' }, // Salvi Lomas
+    '9hUrMoPHICcNwn3j34Ap': { especialidades: 'Periodoncia, Odontología general, Prótesis fija/removible', tratamientos: 'Limpiezas profundas, tratamiento periodontal, extracción de muelas del juicio, prótesis, operatoria, controles, extracción de terceros molares (cirugía compleja). Perodoncia, Cirugías, placas miorrelajantes, Prótesis y Corona' }, // Sarmiento
+    '4nhfGeawwbLnukdFOCuf': { especialidades: 'odontologia general', tratamientos: 'Controles generales, limpiezas, obturaciones' }, // Casero
+    'o6FWZQIlCu0UXf4B2VtU': { especialidades: 'odontologia general, ortodoncia, ortopedia', tratamientos: 'Controles generales, limpiezas, obturaciones, ortodoncia y ortopedia, placas miorrelajantes, Ortodoncia/Ortopedia' }, // Ortiz
+    // Lanús
+    'I9lqSdOdbX7a7TEooHlK': { especialidades: 'Ortodoncia, Ortopedia, ATM, Implantes, Prótesis, Alineadores', tratamientos: 'Brackets, alineadores, aparatología ortopédica, férulas de ATM, rehabilitaciones protésicas, implantes, coronas, mantenimiento de ortodoncia, ortosis, reposición de brackets, placas miorrelajantes, ATM, Prótesis y Corona' }, // Valenzuela Lanús
+    'tvQtc4Cbbvy2JUH11dCg': { especialidades: 'Odontología general, Odontopediatría, Prótesis fija/removible', tratamientos: 'consulta general niños, consulta general adultos, consulta x protesis' }, // Camelli
+    'OdJ6ieB1wKQ0lg4i8Nfm': { especialidades: 'Odontología general, Estética dental, Prótesis fija/removible', tratamientos: 'consulta general adultos, consulta general niños, consulta x protesis' }, // Pelagatti
+    'cdPzPXYlx7vqn0Xeut1C': { especialidades: 'Odontología general, Ortodoncia, Ortopedia', tratamientos: 'Controles generales de adultos y niños, limpieza, obturaciones, ortodoncia con brackets, aparatología ortopédica, placas miorrelajantes, Ortodoncia/Ortopedia' }, // Ponce Lanús
+    '6e69xtepQnxdVOQ9DhRr': { especialidades: 'Odontología general, Estética dental', tratamientos: 'Controles generales de adultos y niños, limpiezas, obturaciones, extracciones simples, protesis removibles' }, // Salvi Lanús
+    'K6v0lMO22Ft7KbBl6fM3': { especialidades: 'odontología general de adultos y niños, tratamientos de conductos uniradiculares, exodoncias simples y protesis', tratamientos: 'Consulta general de adultos, consulta general de niños, consulta x protesis, consulta x cirugia' }, // Figueroa
+    'e4VigEgguTyY1ZSgwrqF': { especialidades: 'odontología general de adultos y niños, tratamientos de conductos uniradiculares, exodoncias simples y protesis', tratamientos: 'Consulta general de adultos, consulta general de niños, tratamiento de conductos simple, consulta x protesis' }, // Viegas
+    'qAQRMl84iTrT4Sp1F7rT': { especialidades: 'Ortodoncia, Ortopedia, odontologia general, protesis', tratamientos: 'Consulta general, Consulta x ortodoncia u ortopedia, ajuste mensual de ortodoncia, ajuste mensual de ortopedia, consulta por proteis' }, // Xavier Coronel
+    'FJ3Hma07moKs2EzxTt6N': { especialidades: 'Odontologia general, tratamientos de conductos premolares, exodoncia simples y 3ros no complejas, protesis', tratamientos: 'Consulta general adultos, tratamiento de conducto simple, consulta x protesis, consulta x cirugia' }, // Ventura
+};
+
+// Aplica el override CSV a filas crudas de Supabase: saca removidos y reemplaza datos.
+function aplicarOverridesCSV(rows) {
+    return (rows || [])
+        .filter(p => !PROF_REMOVIDOS.has(p.calendar_id))
+        .map(p => {
+            const ov = PROF_OVERRIDES[p.calendar_id];
+            return ov ? { ...p, ...ov } : p;
+        });
+}
+
+// Carga (y cachea) todos los profesionales con el override ya aplicado.
+async function getProfesionalesCache() {
+    if (!profesionalesCache.length) {
+        const data = await supaFetch('/profesionales?select=*&order=profesional.asc');
+        profesionalesCache = aplicarOverridesCSV(data);
+    }
+    return profesionalesCache;
+}
+
+// Filtra profesionales por especialidad (searchKeys) + sede, client-side sobre especialidades del CSV.
+function filtrarPorEspecialidad(profs, searchKeys, sedeNorm) {
+    const keys = (Array.isArray(searchKeys) ? searchKeys : [searchKeys]).map(normStr).filter(Boolean);
+    return profs.filter(p => {
+        if (!normStr(p.sede).includes(sedeNorm)) return false;
+        const esp = normStr(p.especialidades);
+        return keys.some(k => esp.includes(k));
+    });
+}
+
 let especialidadSeleccionada = null;
 let sedeSeleccionada = '';
 
@@ -241,13 +307,19 @@ function normStr(s) {
 }
 
 // Normaliza tratamientos: acepta array (jsonb) o string de texto (csv / newlines)
+function normalizarItem(t) {
+    t = t.replace(/\bx\b/g, 'por');
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 function normalizarTratamientos(raw) {
-    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (Array.isArray(raw)) return raw.filter(Boolean).map(normalizarItem);
     if (!raw || typeof raw !== 'string') return [];
     return raw
         .split(/[\n\r,]+/)
         .map(t => t.replace(/^[-\s]+/, '').trim())
-        .filter(t => t.length > 0);
+        .filter(t => t.length > 0)
+        .map(normalizarItem);
 }
 
 function poblarTratamientos(lista, profesionalNombre = '') {
@@ -305,9 +377,14 @@ function getDuracionMinutos(tratamiento, profesionalNombre = '') {
     // Consulta de implantes o cirugía → 15 min (debe ir antes del match genérico de implante)
     if (/consulta.*implante|implante.*consulta/.test(t)) return 15;
     if (/consulta.*cirug|cirug.*consulta/.test(t)) return 15;
-    // Conducto/endodoncia → 45 min SOLO para Biagi; resto → 15 min
+    // Conducto/endodoncia → duración por profesional (CSV clínica 2026-06-11):
+    // Biagi y Ventura → 45 min, Obregón → 25 min, resto → 15 min.
     // endodont* cubre "endodóntico"/"endodontic" (normalizado pierde la tilde)
-    if (/conducto|endodoncia|endodont/.test(t)) return /biagi/.test(p) ? 45 : 15;
+    if (/conducto|endodoncia|endodont/.test(t)) {
+        if (/biagi|ventura/.test(p)) return 45;
+        if (/obregon/.test(p)) return 25;
+        return 15;
+    }
     // Colocación de implante → 45 min
     if (/implante/.test(t)) return 45;
     return null;
@@ -390,8 +467,7 @@ async function cargarProfesionalesSelect() {
     }
     if (container) container.innerHTML = '<p class="placeholder-text" style="text-align:center;padding:1.5rem;">Cargando profesionales...</p>';
     try {
-        const data = await supaFetch('/profesionales?select=*&order=profesional.asc');
-        profesionalesCache = data;
+        await getProfesionalesCache();
         poblarSelectProfesionales();
     } catch (e) {
         console.error(e);
@@ -1640,18 +1716,9 @@ async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
 
     try {
         const sedeNorm = sede.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-        const allProfsArrays = await Promise.all(
-            searchKeys.map(key =>
-                supaFetch(`/profesionales?select=*&especialidades=ilike.*${encodeURIComponent(key)}*&sede=ilike.*${encodeURIComponent(sedeNorm)}*`)
-                    .catch(() => [])
-            )
-        );
-        const seenIds = new Set();
-        especialidadProfesionalesCache = allProfsArrays.flat().filter(p => {
-            if (seenIds.has(p.calendar_id)) return false;
-            seenIds.add(p.calendar_id);
-            return true;
-        });
+        // Filtrado client-side sobre el cache con override CSV (no se consulta especialidades a la DB)
+        const todos = await getProfesionalesCache();
+        especialidadProfesionalesCache = filtrarPorEspecialidad(todos, searchKeys, sedeNorm);
 
         if (!especialidadProfesionalesCache.length) {
             if (tSel) { tSel.innerHTML = '<option value="">No hay profesionales para esta especialidad en esta sede</option>'; tSel.disabled = true; }
