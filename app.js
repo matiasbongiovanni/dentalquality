@@ -123,42 +123,49 @@ const ESPECIALIDADES = [
         label: 'Odontología General',
         desc: 'Consultas, limpiezas y caries',
         searchKey: 'odontolog',
+        tratamientos: ['Consulta general adultos', 'Consulta general niños', 'Limpieza y profilaxis', 'Urgencia'],
     },
     {
         id: 'estetica-dental',
         label: 'Estética Dental',
         desc: 'Reconstrucción, incrustaciones, carillas y coronas',
         searchKey: 'stética',
+        tratamientos: ['Incrustaciones', 'Rehabilitación estética', 'Coronas'],
     },
     {
         id: 'ortodoncia-alineadores',
         label: 'Ortodoncia y Alineadores',
         desc: 'Brackets, Invisalign y corrección dental',
         searchKey: 'ortodon',
+        tratamientos: ['Consulta por ortodoncia u ortopedia', 'Ajuste mensual de ortodoncia', 'Ajuste mensual de ortopedia', 'Reposición de brackets', 'Alineadores'],
     },
     {
         id: 'implantes-protesis',
         label: 'Implantes y Prótesis',
         desc: 'Implantes, coronas y prótesis dentales',
         searchKeys: ['implant', 'protesis', 'prótesis'],
+        tratamientos: ['Consulta por implantes', 'Consulta por prótesis fija o removible', 'Corona'],
     },
     {
         id: 'atm-bruxismo',
         label: 'ATM · Bruxismo',
         desc: 'Dolor mandibular y apretamiento dental',
         searchKey: 'atm',
+        tratamientos: ['Consulta por ATM', 'Placa miorrelajante'],
     },
     {
         id: 'odontopediatria',
         label: 'Odontopediatría y Ortopediatría',
         desc: 'Atención dental y ortopédica para niños',
         searchKey: 'pediatr',
+        tratamientos: ['Atención infantil', 'Flúor y sellantes', 'Operatoria en niños', 'Extracción de piezas temporales', 'Aparatología ortopédica'],
     },
     {
         id: 'endodoncia-conductos',
         label: 'Endodoncia y Conductos',
         desc: 'Tratamientos de conducto y endodoncia',
         searchKeys: ['endodoncia', 'conducto'],
+        tratamientos: ['Tratamiento de conducto', 'Retratamiento endodóntico', 'Restauraciones post-endodoncia'],
     },
 ];
 
@@ -294,7 +301,7 @@ function renderEspecialidadCards() {
                     '<p class="placeholder-text" style="margin:auto;">Primero seleccioná una sede.</p>';
                 return;
             }
-            cargarTratamientosPorEspecialidad(esp.searchKeys || [esp.searchKey], sedeSeleccionada);
+            cargarTratamientosPorEspecialidad(esp.searchKeys || [esp.searchKey], sedeSeleccionada, esp.tratamientos || []);
         };
         grid.appendChild(card);
     });
@@ -1703,20 +1710,18 @@ if (telInput) {
 // =============================================
 // CARGAR TRATAMIENTOS DESDE SUPABASE (por especialidad)
 // =============================================
-async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
+async function cargarTratamientosPorEspecialidad(searchKeys, sede, tratamientosCurados = []) {
     const hidden = document.getElementById('tratamiento');
     const tSel = document.getElementById('tratamientoSelect');
     const formContainer = document.getElementById('agendarFormContainer');
 
     resetBookingForm();
-    if (tSel) { tSel.innerHTML = '<option value="">Cargando tratamientos...</option>'; tSel.disabled = true; }
     if (hidden) hidden.value = '';
     formContainer.style.display = 'block';
     formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     try {
         const sedeNorm = sede.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-        // Filtrado client-side sobre el cache con override CSV (no se consulta especialidades a la DB)
         const todos = await getProfesionalesCache();
         especialidadProfesionalesCache = filtrarPorEspecialidad(todos, searchKeys, sedeNorm);
 
@@ -1727,19 +1732,7 @@ async function cargarTratamientosPorEspecialidad(searchKeys, sede) {
             return;
         }
 
-        // Tratamientos provienen de la DB (unión deduplicada de todos los profesionales de la especialidad)
-        const allTratamientos = [...new Set(
-            especialidadProfesionalesCache.flatMap(p => normalizarTratamientos(p.tratamientos))
-        )].filter(Boolean);
-
-        if (!allTratamientos.length) {
-            if (tSel) { tSel.innerHTML = '<option value="">Sin tratamientos configurados para esta especialidad</option>'; tSel.disabled = true; }
-            document.getElementById('datePickerContainer').innerHTML =
-                '<p class="placeholder-text" style="margin:auto;">Sin tratamientos disponibles. Contactanos por WhatsApp.</p>';
-            return;
-        }
-
-        poblarTratamientos(allTratamientos);
+        poblarTratamientos(tratamientosCurados);
 
         document.getElementById('datePickerContainer').innerHTML =
             '<p class="placeholder-text" style="margin:auto;">Seleccioná un tratamiento para ver disponibilidad.</p>';
