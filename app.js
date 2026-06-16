@@ -164,7 +164,7 @@ const ESPECIALIDADES = [
         label: 'Endodoncia y Conductos',
         desc: 'Tratamientos de conducto y endodoncia',
         searchKeys: ['endodoncia', 'conducto'],
-        tratamientos: ['Consulta de conducto', 'Tratamiento de conducto', 'Retratamiento endodóntico', 'Restauraciones post-endodoncia'],
+        tratamientos: ['Consulta tratamiento de conducto', 'Tratamiento de conducto', 'Retratamiento endodóntico', 'Restauraciones post-endodoncia'],
     },
 ];
 
@@ -385,7 +385,7 @@ function getDuracionMinutos(tratamiento, profesionalNombre = '') {
     // Consultas cortas → 15 min (deben ir antes de los matches genéricos)
     if (/consulta.*implante|implante.*consulta/.test(t)) return 15;
     if (/consulta.*cirug|cirug.*consulta/.test(t)) return 15;
-    if (/consulta.*conducto|conducto.*consulta/.test(t)) return 15;
+    if (/consulta\s+tratamiento\s+de\s+conducto/.test(t)) return 15;
     // Conducto/endodoncia → duración por profesional:
     // Todos → 45 min, excepto Obregón → 25 min.
     // endodont* cubre "endodóntico"/"endodontic" (normalizado pierde la tilde)
