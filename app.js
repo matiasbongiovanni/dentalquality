@@ -19,8 +19,6 @@ async function initConfig() {
     }
 }
 
-const OSDE_PLANES = ['310', '410', '450', '510', '610'];
-
 async function cargarObrasSociales() {
     const sel = document.getElementById('obraSocial');
     if (!sel) return;
@@ -30,13 +28,8 @@ async function cargarObrasSociales() {
         for (const row of data) {
             const nombre = (row.nombre || '').trim();
             if (!nombre) continue;
-            if (nombre.toLowerCase() === 'osde') {
-                for (const plan of OSDE_PLANES) {
-                    entries.push(`OSDE ${plan}`);
-                }
-            } else {
-                entries.push(nombre.charAt(0).toUpperCase() + nombre.slice(1));
-            }
+            // OSDE va una sola vez; el plan (310, 410...) se ingresa en el input "Plan" obligatorio.
+            entries.push(nombre.charAt(0).toUpperCase() + nombre.slice(1));
         }
         sel.innerHTML = '<option value="" disabled selected>Seleccioná tu obra social *</option>';
         for (const label of entries) {
@@ -206,13 +199,15 @@ const PROF_OVERRIDES = {
     'FJ3Hma07moKs2EzxTt6N': { especialidades: 'Odontologia general, tratamientos de conductos premolares, exodoncia simples y 3ros no complejas, protesis', tratamientos: 'Consulta general adultos, tratamiento de conducto simple, consulta x protesis, consulta x cirugia' }, // Ventura
 };
 
-// Aplica el override CSV a filas crudas de Supabase: saca removidos y reemplaza datos.
+// Aplica el override CSV a filas crudas de Supabase: saca removidos y reemplaza
+// SOLO especialidades (para el filtro por especialidad). Los tratamientos vienen
+// siempre de Supabase: la DB es la única fuente de verdad para tratamientos.
 function aplicarOverridesCSV(rows) {
     return (rows || [])
         .filter(p => !PROF_REMOVIDOS.has(p.calendar_id))
         .map(p => {
             const ov = PROF_OVERRIDES[p.calendar_id];
-            return ov ? { ...p, ...ov } : p;
+            return ov ? { ...p, especialidades: ov.especialidades } : p;
         });
 }
 
@@ -384,13 +379,12 @@ function getDuracionMinutos(tratamiento, profesionalNombre = '') {
     // Consulta de implantes o cirugía → 15 min (debe ir antes del match genérico de implante)
     if (/consulta.*implante|implante.*consulta/.test(t)) return 15;
     if (/consulta.*cirug|cirug.*consulta/.test(t)) return 15;
-    // Conducto/endodoncia → duración por profesional (CSV clínica 2026-06-11):
-    // Biagi y Ventura → 45 min, Obregón → 25 min, resto → 15 min.
+    // Conducto/endodoncia → duración por profesional:
+    // Todos → 45 min, excepto Obregón → 25 min.
     // endodont* cubre "endodóntico"/"endodontic" (normalizado pierde la tilde)
     if (/conducto|endodoncia|endodont/.test(t)) {
-        if (/biagi|ventura/.test(p)) return 45;
         if (/obregon/.test(p)) return 25;
-        return 15;
+        return 45;
     }
     // Colocación de implante → 45 min
     if (/implante/.test(t)) return 45;
@@ -832,6 +826,11 @@ document.getElementById('agendarForm')?.addEventListener('submit', function (e) 
     }
     if (!obraSocialCheck) {
         setStatus(status, 'Seleccioná tu obra social o prepaga.');
+        return;
+    }
+    const planCheck = document.getElementById('planObraSocial')?.value.trim() || '';
+    if (!planCheck) {
+        setStatus(status, 'Ingresá el plan de tu obra social.');
         return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
