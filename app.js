@@ -44,30 +44,8 @@ async function cargarObrasSociales() {
             opt.textContent = label;
             sel.appendChild(opt);
         }
-        sel.addEventListener('change', actualizarPlanRequerido);
     } catch (e) {
         console.warn('[ObrasSociales] No se pudo cargar desde Supabase:', e.message);
-    }
-}
-
-function actualizarPlanRequerido() {
-    const sel = document.getElementById('obraSocial');
-    const planInput = document.getElementById('planObraSocial');
-    const planLabel = document.getElementById('planObraSocialLabel');
-    const esParticular = (sel?.value || '').toLowerCase() === 'particular';
-    if (!planInput) return;
-    planInput.required = !esParticular;
-    planInput.disabled = esParticular;
-    planInput.placeholder = esParticular ? 'No aplica' : 'Ej: 310, 410, 450...';
-    if (esParticular) planInput.value = '';
-    if (planLabel) {
-        planLabel.querySelector('span')?.remove();
-        if (!esParticular) {
-            const span = document.createElement('span');
-            span.style.color = '#ef4444';
-            span.textContent = ' *';
-            planLabel.appendChild(span);
-        }
     }
 }
 
@@ -855,12 +833,6 @@ document.getElementById('agendarForm')?.addEventListener('submit', function (e) 
     }
     if (!obraSocialCheck) {
         setStatus(status, 'Seleccioná tu obra social o prepaga.');
-        return;
-    }
-    const planCheck = document.getElementById('planObraSocial')?.value.trim() || '';
-    const esParticular = obraSocialCheck.toLowerCase() === 'particular';
-    if (!planCheck && !esParticular) {
-        setStatus(status, 'Ingresá el plan de tu obra social.');
         return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
