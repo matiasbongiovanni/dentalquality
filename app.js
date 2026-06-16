@@ -32,7 +32,13 @@ async function cargarObrasSociales() {
             entries.push(nombre.charAt(0).toUpperCase() + nombre.slice(1));
         }
         sel.innerHTML = '<option value="" disabled selected>Seleccioná tu obra social *</option>';
+        // "Particular" siempre disponible como primera opción (no requiere plan)
+        const optPart = document.createElement('option');
+        optPart.value = 'Particular';
+        optPart.textContent = 'Particular';
+        sel.appendChild(optPart);
         for (const label of entries) {
+            if (label.toLowerCase() === 'particular') continue; // evitar duplicado si está en la DB
             const opt = document.createElement('option');
             opt.value = label;
             opt.textContent = label;
@@ -180,7 +186,7 @@ const ESPECIALIDADES = [
         label: 'Endodoncia y Conductos',
         desc: 'Tratamientos de conducto y endodoncia',
         searchKeys: ['endodoncia', 'conducto'],
-        tratamientos: ['Tratamiento de conducto', 'Retratamiento endodóntico', 'Restauraciones post-endodoncia'],
+        tratamientos: ['Consulta de conducto', 'Tratamiento de conducto', 'Retratamiento endodóntico', 'Restauraciones post-endodoncia'],
     },
 ];
 
@@ -229,7 +235,7 @@ function aplicarOverridesCSV(rows) {
         .filter(p => !PROF_REMOVIDOS.has(p.calendar_id))
         .map(p => {
             const ov = PROF_OVERRIDES[p.calendar_id];
-            return ov ? { ...p, especialidades: ov.especialidades } : p;
+            return ov ? { ...p, ...ov } : p;
         });
 }
 
@@ -398,9 +404,10 @@ function resetBookingForm() {
 function getDuracionMinutos(tratamiento, profesionalNombre = '') {
     const t = (tratamiento || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const p = (profesionalNombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    // Consulta de implantes o cirugía → 15 min (debe ir antes del match genérico de implante)
+    // Consultas cortas → 15 min (deben ir antes de los matches genéricos)
     if (/consulta.*implante|implante.*consulta/.test(t)) return 15;
     if (/consulta.*cirug|cirug.*consulta/.test(t)) return 15;
+    if (/consulta.*conducto|conducto.*consulta/.test(t)) return 15;
     // Conducto/endodoncia → duración por profesional:
     // Todos → 45 min, excepto Obregón → 25 min.
     // endodont* cubre "endodóntico"/"endodontic" (normalizado pierde la tilde)
