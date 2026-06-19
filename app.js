@@ -171,7 +171,8 @@ const ESPECIALIDADES = [
 // =============================================
 // OVERRIDE CSV CLÍNICA (2026-06-11)
 // Datos oficiales aplicados desde la WEB, sin tocar la DB de Supabase.
-// Clave = calendar_id. Reemplaza especialidades + tratamientos del listado oficial.
+// Clave = calendar_id. Override SOLO de `especialidades` (filtro por especialidad).
+// Los `tratamientos` se ignoran acá: vienen siempre de Supabase (única fuente de verdad).
 // PROF_REMOVIDOS = profesionales que la clínica pidió sacar del listado.
 // =============================================
 const PROF_REMOVIDOS = new Set([
@@ -194,11 +195,11 @@ const PROF_OVERRIDES = {
     '4nhfGeawwbLnukdFOCuf': { especialidades: 'odontologia general', tratamientos: 'Controles generales, limpiezas, obturaciones' }, // Casero
     'o6FWZQIlCu0UXf4B2VtU': { especialidades: 'odontologia general, ortodoncia, ortopedia', tratamientos: 'Controles generales, limpiezas, obturaciones, ortodoncia y ortopedia, placas miorrelajantes, Ortodoncia/Ortopedia' }, // Ortiz
     // Lanús
-    'I9lqSdOdbX7a7TEooHlK': { especialidades: 'Ortodoncia, Ortopedia, ATM, Implantes, Prótesis, Alineadores', tratamientos: 'Brackets, alineadores, aparatología ortopédica, férulas de ATM, rehabilitaciones protésicas, implantes, coronas, mantenimiento de ortodoncia, ortosis, reposición de brackets, placas miorrelajantes, ATM, Prótesis y Corona' }, // Valenzuela Lanús
+    'I9lqSdOdbX7a7TEooHlK': { especialidades: 'Ortodoncia, Ortopedia, ATM, Implantes, Prótesis, Alineadores', tratamientos: 'consulta x ortodoncia u ortopedia, ajuste mensual de ortodoncia, ajuste mensual de ortopedia (removibles), consulta x ATM, consulta x implantes, consulta x cirugias complejas, consulta x protesis fija o removible' }, // Valenzuela Lanús (igualado a Lomas)
     'tvQtc4Cbbvy2JUH11dCg': { especialidades: 'Odontología general, Odontopediatría, Prótesis fija/removible', tratamientos: 'consulta general niños, consulta general adultos, consulta x protesis' }, // Camelli
     'OdJ6ieB1wKQ0lg4i8Nfm': { especialidades: 'Odontología general, Estética dental, Prótesis fija/removible', tratamientos: 'consulta general adultos, consulta general niños, consulta x protesis' }, // Pelagatti
-    'cdPzPXYlx7vqn0Xeut1C': { especialidades: 'Odontología general, Ortodoncia, Ortopedia', tratamientos: 'Controles generales de adultos y niños, limpieza, obturaciones, ortodoncia con brackets, aparatología ortopédica, placas miorrelajantes, Ortodoncia/Ortopedia' }, // Ponce Lanús
-    '6e69xtepQnxdVOQ9DhRr': { especialidades: 'Odontología general, Estética dental', tratamientos: 'Controles generales de adultos y niños, limpiezas, obturaciones, extracciones simples, protesis removibles' }, // Salvi Lanús
+    'cdPzPXYlx7vqn0Xeut1C': { especialidades: 'Odontología general, Ortodoncia, Ortopedia', tratamientos: 'consulta general niños o adultos, consulta x ortodoncia u ortopedia, ajuste mensual de ortodoncia u ortopedia' }, // Ponce Lanús (igualado a Lomas)
+    '6e69xtepQnxdVOQ9DhRr': { especialidades: 'Odontología general, Estética dental', tratamientos: 'Consulta general de adultos, consulta general de niños, consulta x protesis x ioma, consulta protesis particular o reintegro' }, // Salvi Lanús (igualado a Lomas)
     'K6v0lMO22Ft7KbBl6fM3': { especialidades: 'odontología general de adultos y niños, tratamientos de conductos uniradiculares, exodoncias simples y protesis', tratamientos: 'Consulta general de adultos, consulta general de niños, consulta x protesis, consulta x cirugia' }, // Figueroa
     'e4VigEgguTyY1ZSgwrqF': { especialidades: 'odontología general de adultos y niños, tratamientos de conductos uniradiculares, exodoncias simples y protesis', tratamientos: 'Consulta general de adultos, consulta general de niños, tratamiento de conductos simple, consulta x protesis' }, // Viegas
     'qAQRMl84iTrT4Sp1F7rT': { especialidades: 'Ortodoncia, Ortopedia, odontologia general, protesis', tratamientos: 'Consulta general, Consulta x ortodoncia u ortopedia, ajuste mensual de ortodoncia, ajuste mensual de ortopedia, consulta por proteis' }, // Xavier Coronel
@@ -213,7 +214,9 @@ function aplicarOverridesCSV(rows) {
         .filter(p => !PROF_REMOVIDOS.has(p.calendar_id))
         .map(p => {
             const ov = PROF_OVERRIDES[p.calendar_id];
-            return ov ? { ...p, ...ov } : p;
+            // Solo override de `especialidades` (filtro client-side). Los `tratamientos`
+            // NUNCA se sobreescriben: la DB de Supabase es la única fuente de verdad.
+            return ov ? { ...p, especialidades: ov.especialidades } : p;
         });
 }
 
