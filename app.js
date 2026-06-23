@@ -1084,12 +1084,13 @@ function escapeHtml(str) {
     }[c]));
 }
 
-// GHL devuelve fechas de turnos como "YYYY-MM-DD HH:mm:ss" en horario LOCAL (ART = UTC-3), sin timezone marker.
-// Agregar Z los trataba como UTC → mostraba 3h menos. Usar -03:00 para interpretarlos correctamente.
+// GHL devuelve fechas de turnos como "YYYY-MM-DD HH:mm:ss" (ART, sin timezone marker) en algunos
+// endpoints, pero el de appointments a veces ya trae offset propio. Agregar "-03:00" sin chequear
+// si ya tiene uno producía timezone duplicado → new Date() inválida → la card no mostraba fecha/hora.
+// normalizarIsoArt ya hace ese chequeo (se usa para los slots libres), así que la reusamos acá también.
 function ghlTimeToIso(raw) {
     if (!raw) return null;
-    // "2026-06-05 13:00:00" (ART) → "2026-06-05T13:00:00-03:00"
-    return raw.replace(' ', 'T') + '-03:00';
+    return normalizarIsoArt(raw.replace(' ', 'T'));
 }
 
 let _buscandoTurnos = false;
