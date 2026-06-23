@@ -864,14 +864,14 @@ document.getElementById('agendarForm')?.addEventListener('submit', function (e) 
     }
 
     // Armar resumen para el modal de confirmación
-    const fechaStr = slotSeleccionado.startTime
-        ? new Date(slotSeleccionado.startTime).toLocaleString('es-AR', {
+    const fechaStr = slotSeleccionado.d
+        ? slotSeleccionado.d.toLocaleString('es-AR', {
             weekday: 'long', day: 'numeric', month: 'long',
             hour: '2-digit', minute: '2-digit', timeZone: TZ
           })
-        : slotSeleccionado.dateLabel || '';
-    const profesional = slotSeleccionado.profesionalNombre || '';
-    const sede = slotSeleccionado.sedeName || slotSeleccionado.calendarName || sedeSeleccionada || '';
+        : '';
+    const profesional = slotSeleccionado.profesional || '';
+    const sede = slotSeleccionado.sede || sedeSeleccionada || '';
     const durMin = getDuracionMinutos(tratamiento, profesional);
     const obraSocialModal = document.getElementById('obraSocial')?.value || '';
     const planModal = document.getElementById('planObraSocial')?.value.trim() || '';
@@ -969,7 +969,7 @@ async function ejecutarAgendamiento() {
         if (!contactId) throw new Error('No se pudo crear el contacto.');
 
         // 2. Crear cita en GHL
-        const duracionMin = getDuracionMinutos(tratamiento, slotSeleccionado?.profesionalNombre || '');
+        const duracionMin = getDuracionMinutos(tratamiento, slotSeleccionado?.profesional || '');
         const startMs = new Date(startTime).getTime();
         const customEndTime = duracionMin
             ? new Date(startMs + duracionMin * 60_000).toISOString()
@@ -1050,8 +1050,8 @@ async function ejecutarAgendamiento() {
                     phone: telefono,
                     Tratamiento: tratamiento,
                     'Obra Social': obraSocialConPlan,
-                    profesional: slotSeleccionado?.profesionalNombre || '',
-                    sede: slotSeleccionado?.sedeName || slotSeleccionado?.calendarName || '',
+                    profesional: slotSeleccionado?.profesional || '',
+                    sede: slotSeleccionado?.sede || '',
                     startTime,
                     appointmentId
                 })
