@@ -24,6 +24,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/agendar", "destination": "/index.html" },
+    { "source": "/reagendar", "destination": "/index.html" },
     { "source": "/api/:path*", "destination": "/api/:path*" }
   ]
 }

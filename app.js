@@ -1210,7 +1210,10 @@ async function buscarMisTurnos() {
             };
             const st = statusMap[rawStatus] || { label: rawStatus, cls: 'status-pending' };
 
-            const tratamiento = apt.title || '';
+            const rawTitle = apt.title || '';
+            const tratamiento = rawTitle.includes(' - ')
+                ? rawTitle.split(' - ').pop().trim()
+                : rawTitle;
             const calendarName = `${profesionalRow}${sedeRow ? ' - ' + sedeRow : ''}`;
             const phone = personasInfo.telefono || '';
             const fullName = personasInfo.fullName || '';
@@ -1809,3 +1812,10 @@ document.getElementById('tratamiento')?.addEventListener('change', function () {
 // INIT
 // =============================================
 initConfig();
+
+// Routing por URL: /agendar → tab agendar (default), /reagendar → tab misturnos
+(function routeByPath() {
+    const path = window.location.pathname;
+    if (path === '/reagendar') selectTab('misturnos');
+    else if (path === '/agendar') selectTab('agendar');
+})();
