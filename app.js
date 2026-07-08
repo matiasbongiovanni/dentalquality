@@ -249,7 +249,9 @@ function setSede(sede) {
     bookingMode = null;
     resetBookingForm();
 
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#sedeSelector .sede-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#sedeSelector .sede-btn[data-sede="${sede}"]`)?.classList.add('active');
+    document.querySelectorAll('#bookingModeSelector .mode-btn').forEach(b => b.classList.remove('active'));
 
     const profContainer = document.getElementById('profGridContainer');
     const espContainer = document.getElementById('espGridContainer');
@@ -265,8 +267,8 @@ function setBookingMode(mode) {
     especialidadSeleccionada = null;
     resetBookingForm();
 
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector(`.mode-btn[data-mode="${mode}"]`)?.classList.add('active');
+    document.querySelectorAll('#bookingModeSelector .mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#bookingModeSelector .mode-btn[data-mode="${mode}"]`)?.classList.add('active');
 
     const profContainer = document.getElementById('profGridContainer');
     const espContainer = document.getElementById('espGridContainer');
@@ -1096,6 +1098,25 @@ function ghlTimeToIso(raw) {
     return normalizarIsoArt(raw.replace(' ', 'T'));
 }
 
+const APPOINTMENT_STATUS_MAP = {
+    confirmed: { label: 'Confirmado', cls: 'status-confirmed' },
+    booked: { label: 'Confirmado', cls: 'status-confirmed' },
+    cancelled: { label: 'Cancelado', cls: 'status-cancelled' },
+    showed: { label: 'Atendido', cls: 'status-confirmed' },
+    noshow: { label: 'No asistió', cls: 'status-cancelled' },
+};
+
+function getAppointmentStatus(apt) {
+    const rawStatus = (apt.appointmentStatus || 'confirmed').toLowerCase();
+    const st = APPOINTMENT_STATUS_MAP[rawStatus] || { label: rawStatus, cls: 'status-pending' };
+    return {
+        rawStatus,
+        label: st.label,
+        cls: st.cls,
+        isCancelled: st.cls === 'status-cancelled',
+    };
+}
+
 let _buscandoTurnos = false;
 async function buscarMisTurnos() {
     if (_buscandoTurnos) return;
@@ -1184,6 +1205,9 @@ async function buscarMisTurnos() {
             const startDate = startIso ? new Date(startIso) : null;
             return startDate && startDate >= hoyArg;
         }).sort((a, b) => {
+            const aCancelled = getAppointmentStatus(a).isCancelled;
+            const bCancelled = getAppointmentStatus(b).isCancelled;
+            if (aCancelled !== bCancelled) return aCancelled ? 1 : -1;
             return new Date(ghlTimeToIso(a.startTime)) - new Date(ghlTimeToIso(b.startTime));
         });
 
@@ -1201,17 +1225,8 @@ async function buscarMisTurnos() {
             const start = new Date(isoStart);
             const fechaStr = start.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: TZ });
             const horaStr = start.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
-            const rawStatus = (apt.appointmentStatus || 'confirmed').toLowerCase();
-            const isCancelled = rawStatus === 'cancelled' || rawStatus === 'cancelado';
-
-            const statusMap = {
-                confirmed: { label: 'Confirmado', cls: 'status-confirmed' },
-                booked: { label: 'Confirmado', cls: 'status-confirmed' },
-                cancelled: { label: 'Cancelado', cls: 'status-cancelled' },
-                showed: { label: 'Atendido', cls: 'status-confirmed' },
-                noshow: { label: 'No asistió', cls: 'status-cancelled' },
-            };
-            const st = statusMap[rawStatus] || { label: rawStatus, cls: 'status-pending' };
+            const st = getAppointmentStatus(apt);
+            const isCancelled = st.isCancelled;
 
             const rawTitle = apt.title || '';
             const tratamiento = rawTitle.includes(' - ')
