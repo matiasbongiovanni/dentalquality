@@ -23,20 +23,6 @@
       ]
     }
   ],
-  "redirects": [
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "dentalquality.vercel.app" }],
-      "destination": "https://agendamiento.mgvdental.net",
-      "permanent": true
-    },
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "dentalquality.vercel.app" }],
-      "destination": "https://agendamiento.mgvdental.net/:path*",
-      "permanent": true
-    }
-  ],
   "rewrites": [
     { "source": "/agendar", "destination": "/index.html" },
     { "source": "/reagendar", "destination": "/index.html" },
