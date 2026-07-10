@@ -17,6 +17,10 @@ function validateAgendamiento(body) {
         errors.push('phone: requerido, mínimo 10 dígitos (código área + número AR)');
     }
 
+    if (!body.contact_id || typeof body.contact_id !== 'string' || body.contact_id.trim().length < 1) {
+        errors.push('contact_id: requerido');
+    }
+
     const dni = String(body.DNI || '').replace(/\./g, '').trim();
     if (!dni || !/^\d{7,8}$/.test(dni)) {
         errors.push('DNI: requerido, 7 u 8 dígitos numéricos');

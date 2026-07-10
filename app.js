@@ -1013,6 +1013,7 @@ async function ejecutarAgendamiento() {
                 full_name: `${nombre} ${apellido}`,
                 phone: telefono,
                 DNI: dni,
+                contact_id: contactId,
                 'Obra Social': obraSocialConPlan,
                 Tratamiento: tratamiento,
                 calendar: {
