@@ -206,9 +206,20 @@ const PROF_OVERRIDES = {
     'FJ3Hma07moKs2EzxTt6N': { especialidades: 'Odontologia general, tratamientos de conductos premolares, exodoncia simples y 3ros no complejas, protesis', tratamientos: 'Consulta general adultos, tratamiento de conducto simple, consulta x protesis, consulta x cirugia' }, // Ventura
 };
 
+// Tratamientos que se SUMAN (no reemplazan) a la lista que trae Supabase, por calendar_id.
+// Mismo patrón que PROF_OVERRIDES: cambio pedido por la clínica sin tocar la DB (2026-07-16).
+const TRATAMIENTOS_EXTRA = {
+    '6e69xtepQnxdVOQ9DhRr': ['Consulta para niños'], // Salvi Catarina (Lanús)
+    'cdPzPXYlx7vqn0Xeut1C': ['Consulta para niños'], // Yadira Ponce (Lanús)
+    'qAQRMl84iTrT4Sp1F7rT': ['Consulta para niños'], // Xavier Coronel (Lanús)
+    'tvQtc4Cbbvy2JUH11dCg': ['Consulta para niños'], // Camelli Lorena (Lanús)
+    'K6v0lMO22Ft7KbBl6fM3': ['Consulta para niños'], // Figueroa Franco (Lanús)
+};
+
 // Aplica el override CSV a filas crudas de Supabase: saca removidos y reemplaza
 // SOLO especialidades (para el filtro por especialidad). Los tratamientos vienen
 // siempre de Supabase: la DB es la única fuente de verdad para tratamientos.
+// TRATAMIENTOS_EXTRA es la única excepción: se suma (no reemplaza) a lo que trae la DB.
 function aplicarOverridesCSV(rows) {
     return (rows || [])
         .filter(p => !PROF_REMOVIDOS.has(p.calendar_id))
@@ -216,7 +227,12 @@ function aplicarOverridesCSV(rows) {
             const ov = PROF_OVERRIDES[p.calendar_id];
             // Solo override de `especialidades` (filtro client-side). Los `tratamientos`
             // NUNCA se sobreescriben: la DB de Supabase es la única fuente de verdad.
-            return ov ? { ...p, especialidades: ov.especialidades } : p;
+            let out = ov ? { ...p, especialidades: ov.especialidades } : p;
+            const extra = TRATAMIENTOS_EXTRA[p.calendar_id];
+            if (extra && extra.length) {
+                out = { ...out, tratamientos: [...normalizarTratamientos(out.tratamientos), ...extra] };
+            }
+            return out;
         });
 }
 
@@ -335,6 +351,44 @@ function normalizarTratamientos(raw) {
         .map(normalizarItem);
 }
 
+// Match por palabras clave: cada profesional redacta el mismo tratamiento distinto
+// ("consulta general niños o adultos", "consulta general de niños"). Match exacto
+// de string fallaba siempre y forzaba un fallback peligroso (ver caller). Acá se
+// exige que TODAS las palabras significativas del tratamiento buscado aparezcan
+// (por prefijo, para tolerar singular/plural) en el tratamiento del profesional.
+const TRATAMIENTO_STOPWORDS = new Set(['de', 'del', 'o', 'u', 'x', 'por', 'y', 'a', 'en', 'la', 'el', 'los', 'las', 'consulta', 'tratamiento', 'tratamientos', 'atencion']);
+
+function tratamientoCoincide(tratamientoProfesional, tratamientoBuscadoNorm) {
+    const tn = normStr(tratamientoProfesional);
+    if (tn === tratamientoBuscadoNorm) return true;
+    const palabrasBuscadas = tratamientoBuscadoNorm
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !TRATAMIENTO_STOPWORDS.has(w));
+    if (!palabrasBuscadas.length) return false;
+    const palabrasProfesional = tn.split(/\s+/);
+    return palabrasBuscadas.every(p =>
+        palabrasProfesional.some(c => c.startsWith(p) || p.startsWith(c))
+    );
+}
+
+// Igual que tratamientoCoincide pero pooleando TODOS los tratamientos + especialidades
+// del profesional en un solo corpus. Necesario porque cada prof redacta el mismo
+// servicio compuesto repartido en items separados ("Flúor", "Sellantes" como dos
+// entradas CSV distintas) o solo lo nombra en "especialidades" y no en "tratamientos"
+// (ej: "Alineadores"). Exigir que todas las palabras coincidan en UN solo item
+// bloqueaba disponibilidad real. Ver bug 2026-07-21.
+function profesionalOfreceTratamiento(prof, tratamientoBuscadoNorm) {
+    const palabrasBuscadas = tratamientoBuscadoNorm
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !TRATAMIENTO_STOPWORDS.has(w));
+    if (!palabrasBuscadas.length) return false;
+    const corpus = normStr(`${prof.tratamientos || ''} ${prof.especialidades || ''}`);
+    const palabrasCorpus = corpus.split(/[^a-z0-9]+/).filter(Boolean);
+    return palabrasBuscadas.every(p =>
+        palabrasCorpus.some(c => c.startsWith(p) || p.startsWith(c))
+    );
+}
+
 function poblarTratamientos(lista, profesionalNombre = '', sede = '') {
     const sel = document.getElementById('tratamientoSelect');
     const hidden = document.getElementById('tratamiento');
@@ -393,12 +447,12 @@ function getDuracionMinutos(tratamiento, profesionalNombre = '', sede = '') {
     if (/consulta.*cirug|cirug.*consulta/.test(t)) return 15;
     if (/consulta\s+tratamiento\s+de\s+conducto/.test(t)) return 15;
     // Conducto/endodoncia → duración por profesional:
-    // Todos → 45 min, excepto Obregón → 25 min y Lescano en Lomas → 90 min
-    // (hay otra Dra. Lescano en Lanús que no recibe este override).
+    // Todos → 45 min, excepto Obregón → 25 min y Lescano (Lanús y Lomas) → 90 min
+    // (conducto compuesto, sector posterior/molares — pedido 2026-07-16).
     // endodont* cubre "endodóntico"/"endodontic" (normalizado pierde la tilde)
     if (/conducto|endodoncia|endodont/.test(t)) {
         if (/obregon/.test(p)) return 25;
-        if (/lescano/.test(p) && /lomas/.test(s)) return 90;
+        if (/lescano/.test(p)) return 90;
         return 45;
     }
     // Colocación de implante → 45 min
@@ -491,6 +545,22 @@ async function cargarProfesionalesSelect() {
     }
 }
 
+// Orden pedido por Andrea (2026-07-16): Camelli venía primera (alfabético) y se
+// le sobrecargaba la agenda. Se rota para repartir demanda hacia el resto,
+// en especial el otro odontopediatra (Figueroa).
+const ORDEN_LANUS = [
+    'K6v0lMO22Ft7KbBl6fM3', // Franco Figueroa
+    'OdJ6ieB1wKQ0lg4i8Nfm', // Roxana Pelagatti
+    'cdPzPXYlx7vqn0Xeut1C', // Yadira Ponce
+    '6e69xtepQnxdVOQ9DhRr', // Catarina Salvi
+    'FJ3Hma07moKs2EzxTt6N', // Belen Ventura
+    'K6Aln5wgTxxRVzeE0YGs', // Sofia Lescano
+    'e4VigEgguTyY1ZSgwrqF', // Marcela Viegas
+    'tvQtc4Cbbvy2JUH11dCg', // Lorena Camelli
+    'I9lqSdOdbX7a7TEooHlK', // Matias Valenzuela
+    'qAQRMl84iTrT4Sp1F7rT', // Xavier Coronel
+];
+
 function poblarSelectProfesionales() {
     const container = document.getElementById('profGridContainer');
     if (!container) return;
@@ -510,6 +580,10 @@ function poblarSelectProfesionales() {
         if (!grupos[sede]) grupos[sede] = [];
         grupos[sede].push(prof);
     });
+
+    if (grupos['Lanus']) {
+        grupos['Lanus'].sort((a, b) => ORDEN_LANUS.indexOf(a.calendar_id) - ORDEN_LANUS.indexOf(b.calendar_id));
+    }
 
     container.innerHTML = '';
     const sedes = Object.keys(grupos).sort();
@@ -1815,10 +1889,12 @@ document.getElementById('tratamiento')?.addEventListener('change', function () {
         return;
     }
     const tratamientoNorm = normStr(tratamientoElegido);
-    const profsConTratamiento = especialidadProfesionalesCache.filter(p =>
-        normalizarTratamientos(p.tratamientos).some(t => normStr(t) === tratamientoNorm)
+    const profsAUsar = especialidadProfesionalesCache.filter(p =>
+        profesionalOfreceTratamiento(p, tratamientoNorm)
     );
-    const profsAUsar = profsConTratamiento.length ? profsConTratamiento : especialidadProfesionalesCache;
+    // Nunca caer de vuelta a "todos los de la especialidad": si nadie ofrece
+    // este tratamiento puntual, no hay que asignar un profesional que no lo hace
+    // (ej: Motta es odontología general pero no atiende consulta para niños).
     if (!profsAUsar.length) {
         document.getElementById('datePickerContainer').innerHTML =
             '<p class="placeholder-text" style="margin:auto;">No hay disponibilidad para ese tratamiento en esta sede. Contactanos por WhatsApp.</p>';
