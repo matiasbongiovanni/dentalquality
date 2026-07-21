@@ -382,6 +382,7 @@ function tratamientoCoincide(tratamientoProfesional, tratamientoBuscadoNorm) {
 // porque son raíces distintas — se necesita equivalencia explícita.
 const TRATAMIENTO_SINONIMOS = {
     infantil: ['nino', 'ninos'],
+    profilaxis: ['limpieza', 'limpiezas'],
 };
 
 function profesionalOfreceTratamiento(prof, tratamientoBuscadoNorm) {
