@@ -377,6 +377,13 @@ function tratamientoCoincide(tratamientoProfesional, tratamientoBuscadoNorm) {
 // entradas CSV distintas) o solo lo nombra en "especialidades" y no en "tratamientos"
 // (ej: "Alineadores"). Exigir que todas las palabras coincidan en UN solo item
 // bloqueaba disponibilidad real. Ver bug 2026-07-21.
+// Palabras del menú curado que la DB nunca redacta igual (cada profesional
+// escribe "niños"/"nino", jamás "infantil"). Match por prefijo no alcanza
+// porque son raíces distintas — se necesita equivalencia explícita.
+const TRATAMIENTO_SINONIMOS = {
+    infantil: ['nino', 'ninos'],
+};
+
 function profesionalOfreceTratamiento(prof, tratamientoBuscadoNorm) {
     const palabrasBuscadas = tratamientoBuscadoNorm
         .split(/\s+/)
@@ -384,9 +391,10 @@ function profesionalOfreceTratamiento(prof, tratamientoBuscadoNorm) {
     if (!palabrasBuscadas.length) return false;
     const corpus = normStr(`${prof.tratamientos || ''} ${prof.especialidades || ''}`);
     const palabrasCorpus = corpus.split(/[^a-z0-9]+/).filter(Boolean);
-    return palabrasBuscadas.every(p =>
-        palabrasCorpus.some(c => c.startsWith(p) || p.startsWith(c))
-    );
+    return palabrasBuscadas.every(p => {
+        const variantes = [p, ...(TRATAMIENTO_SINONIMOS[p] || [])];
+        return palabrasCorpus.some(c => variantes.some(v => c.startsWith(v) || v.startsWith(c)));
+    });
 }
 
 function poblarTratamientos(lista, profesionalNombre = '', sede = '') {
