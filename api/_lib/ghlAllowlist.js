@@ -6,6 +6,7 @@ const ALLOWED_PATHS = [
     { pattern: /^calendars\/events\/appointments\/[^/]+$/, methods: ['GET', 'PUT', 'PATCH'] },
     { pattern: /^calendars\/[^/]+\/free-slots$/, methods: ['GET'] },
     { pattern: /^calendars\/[^/]+$/, methods: ['GET'] },
+    { pattern: /^calendars\/events$/, methods: ['GET'] },
 ];
 
 function isAllowed(path, method) {

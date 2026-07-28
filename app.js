@@ -206,6 +206,45 @@ const PROF_OVERRIDES = {
     'FJ3Hma07moKs2EzxTt6N': { especialidades: 'Odontologia general, tratamientos de conductos premolares, exodoncia simples y 3ros no complejas, protesis', tratamientos: 'Consulta general adultos, tratamiento de conducto simple, consulta x protesis, consulta x cirugia' }, // Ventura
 };
 
+// =============================================
+// FILTRO POR ESPECIALIDAD — MAPA POR ID (2026-07-21)
+// Reemplaza el matching por texto (normStr + includes sobre `especialidades`,
+// con sinónimos hardcodeados para "niños"/"infantil" etc.) que rompía cada vez
+// que un profesional redactaba su especialidad distinto en Supabase. Acá cada
+// calendar_id apunta directo a los IDs fijos de ESPECIALIDADES (arriba) — sin
+// tocar la DB, mismo patrón que PROF_OVERRIDES. Único punto a mantener cuando
+// entra un profesional nuevo o cambia de especialidad.
+// =============================================
+const PROF_ESPECIALIDAD_IDS = {
+    // Lomas
+    'SgbpPdcPphpH7ZbkTFbc': ['odontologia-general', 'estetica-dental', 'ortodoncia-alineadores', 'implantes-protesis'], // Aquino
+    '4nhfGeawwbLnukdFOCuf': ['odontologia-general'], // Casero
+    'Zq7100ll92Z4E0nz5KjK': ['odontopediatria'], // Cerpa
+    'INWHPw6IKdhr47OWIeon': ['endodoncia-conductos'], // Lescano Lomas
+    'opojJgc5t7AP4qyI45W4': ['endodoncia-conductos', 'implantes-protesis'], // Obregón
+    'SUg5Zcw8yX5xFUmT6z8j': ['odontologia-general', 'ortodoncia-alineadores'], // Peñafiel
+    'USfwitDKerLMat4LHTGv': ['odontologia-general', 'ortodoncia-alineadores'], // Ponce Lomas
+    'HlKSamINK5hVjaPGQ0bf': ['odontopediatria'], // Ramírez
+    'm0N9lnZ8bDodxxuM7Dmb': ['odontologia-general', 'estetica-dental'], // Salvi Lomas
+    '9hUrMoPHICcNwn3j34Ap': ['odontologia-general', 'implantes-protesis'], // Sarmiento
+    '5ytCBjhAChRiz1ensnPn': ['endodoncia-conductos', 'estetica-dental'], // Biagi
+    '0n6XtIjxoeBaPi6hqfgG': ['odontologia-general', 'implantes-protesis'], // Motta
+    'o6FWZQIlCu0UXf4B2VtU': ['odontologia-general', 'ortodoncia-alineadores'], // Ortiz
+    'Dyu7zKC6phLyMdfnjShs': ['ortodoncia-alineadores', 'atm-bruxismo', 'implantes-protesis'], // Valenzuela Lomas
+    'YuxhsinjGYln0W31rktA': ['endodoncia-conductos'], // Acuña Franco Lautaro
+    // Lanús
+    'tvQtc4Cbbvy2JUH11dCg': ['odontologia-general', 'odontopediatria', 'implantes-protesis'], // Camelli
+    'K6Aln5wgTxxRVzeE0YGs': ['odontologia-general', 'implantes-protesis', 'endodoncia-conductos'], // Lescano Lanús
+    'e4VigEgguTyY1ZSgwrqF': ['odontologia-general', 'endodoncia-conductos', 'implantes-protesis'], // Viegas
+    'OdJ6ieB1wKQ0lg4i8Nfm': ['odontologia-general', 'estetica-dental', 'implantes-protesis'], // Pelagatti
+    'cdPzPXYlx7vqn0Xeut1C': ['odontologia-general', 'ortodoncia-alineadores'], // Ponce Lanús
+    '6e69xtepQnxdVOQ9DhRr': ['odontologia-general', 'estetica-dental'], // Salvi Lanús
+    'K6v0lMO22Ft7KbBl6fM3': ['odontologia-general', 'endodoncia-conductos', 'implantes-protesis'], // Figueroa
+    'qAQRMl84iTrT4Sp1F7rT': ['ortodoncia-alineadores', 'odontologia-general', 'implantes-protesis'], // Xavier Coronel
+    'FJ3Hma07moKs2EzxTt6N': ['odontologia-general', 'endodoncia-conductos', 'implantes-protesis'], // Ventura
+    'I9lqSdOdbX7a7TEooHlK': ['ortodoncia-alineadores', 'atm-bruxismo', 'implantes-protesis'], // Valenzuela Lanús
+};
+
 // Tratamientos que se SUMAN (no reemplazan) a la lista que trae Supabase, por calendar_id.
 // Mismo patrón que PROF_OVERRIDES: cambio pedido por la clínica sin tocar la DB (2026-07-16).
 const TRATAMIENTOS_EXTRA = {
@@ -245,13 +284,14 @@ async function getProfesionalesCache() {
     return profesionalesCache;
 }
 
-// Filtra profesionales por especialidad (searchKeys) + sede, client-side sobre especialidades del CSV.
-function filtrarPorEspecialidad(profs, searchKeys, sedeNorm) {
-    const keys = (Array.isArray(searchKeys) ? searchKeys : [searchKeys]).map(normStr).filter(Boolean);
+// Filtra profesionales por especialidad (id fijo, ver PROF_ESPECIALIDAD_IDS) + sede exacta.
+// Sin matching de texto: si un calendar_id no está en el mapa, no entra a ninguna
+// especialidad (falla cerrado, no abierto — evita el bug de "aparece en todas").
+function filtrarPorEspecialidad(profs, espId, sede) {
     return profs.filter(p => {
-        if (!normStr(p.sede).includes(sedeNorm)) return false;
-        const esp = normStr(p.especialidades);
-        return keys.some(k => esp.includes(k));
+        if ((p.sede || '') !== sede) return false;
+        const ids = PROF_ESPECIALIDAD_IDS[p.calendar_id];
+        return !!ids && ids.includes(espId);
     });
 }
 
@@ -323,7 +363,7 @@ function renderEspecialidadCards() {
                     '<p class="placeholder-text" style="margin:auto;">Primero seleccioná una sede.</p>';
                 return;
             }
-            cargarTratamientosPorEspecialidad(esp.searchKeys || [esp.searchKey], sedeSeleccionada, esp.tratamientos || []);
+            cargarTratamientosPorEspecialidad(esp.id, sedeSeleccionada, esp.tratamientos || []);
         };
         grid.appendChild(card);
     });
@@ -505,7 +545,12 @@ async function supaFetch(path) {
     return data;
 }
 
-async function ghlFetch(path, opts = {}) {
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// 429 (nuestro proxy o GHL) no es "no hay turnos" — es que se pidieron muchos
+// horarios en simultáneo (varios profesionales x 3 meses). Reintenta con backoff
+// en vez de tirar el error para arriba y que se muestre como "sin disponibilidad".
+async function ghlFetch(path, opts = {}, _retryCount = 0) {
     const PROXY_URL = '/api/ghl?path=';
     const [basePath, queryStr] = path.split('?');
     const finalUrl = `${PROXY_URL}${encodeURIComponent(basePath)}${queryStr ? '&' + queryStr : ''}`;
@@ -513,6 +558,14 @@ async function ghlFetch(path, opts = {}) {
         ...opts,
         headers: { ...opts.headers, 'Content-Type': 'application/json' }
     });
+
+    if (res.status === 429 && _retryCount < 3) {
+        const retryAfter = parseInt(res.headers.get('Retry-After'), 10);
+        const waitMs = !isNaN(retryAfter) ? retryAfter * 1000 : 500 * Math.pow(2, _retryCount);
+        await sleep(waitMs);
+        return ghlFetch(path, opts, _retryCount + 1);
+    }
+
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
         const raw = Array.isArray(json.message)
@@ -860,7 +913,39 @@ function dibujarTarjetasDeDias(container) {
 // =============================================
 // 3. SELECCIONAR FECHA Y HORARIOS
 // =============================================
-function seleccionarFecha(dateStr, cardEl) {
+// GHL free-slots devuelve horarios espaciados según el slotDuration propio del
+// calendario (ej: cada 29/30 min), sin importar cuánto dure el tratamiento elegido.
+// Para un tratamiento largo (ej: conducto 90 min) eso muestra horarios que en
+// realidad caen DENTRO de un turno ya agendado. Acá se traen los eventos reales
+// del/los calendario(s) de ese día y se descartan los slots cuyo rango
+// [inicio, inicio+duración) se superpone con algún turno existente.
+async function filtrarSlotsPorSolapamiento(parsed, dateStr, duracionMin) {
+    if (!duracionMin) return parsed;
+    const calendarIds = [...new Set(parsed.map(s => s.calendarId))];
+    const dayStart = new Date(`${dateStr}T00:00:00-03:00`).getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+    const eventosPorCalendar = {};
+    await Promise.all(calendarIds.map(async calId => {
+        try {
+            const res = await ghlFetch(`calendars/events?calendarId=${calId}&startTime=${dayStart}&endTime=${dayEnd}`);
+            eventosPorCalendar[calId] = (res?.events || []).filter(ev => !/cancel/i.test(String(ev.appointmentStatus || '')));
+        } catch (_) {
+            eventosPorCalendar[calId] = [];
+        }
+    }));
+    return parsed.filter(slot => {
+        const startMs = slot.d.getTime();
+        const endMs = startMs + duracionMin * 60_000;
+        const eventos = eventosPorCalendar[slot.calendarId] || [];
+        return !eventos.some(ev => {
+            const evStart = new Date(ev.startTime).getTime();
+            const evEnd = ev.endTime ? new Date(ev.endTime).getTime() : evStart;
+            return evStart < endMs && evEnd > startMs;
+        });
+    });
+}
+
+async function seleccionarFecha(dateStr, cardEl) {
     document.getElementById('appointmentDate').value = dateStr;
     document.getElementById('appointmentTime').value = '';
     slotSeleccionado = null;
@@ -877,7 +962,7 @@ function seleccionarFecha(dateStr, cardEl) {
     }
 
     const seen = new Set();
-    const parsed = slotsData
+    let parsed = slotsData
         .filter(slot => {
             const key = `${slot.iso}|${slot.calendarId}`;
             if (seen.has(key)) return false;
@@ -885,6 +970,22 @@ function seleccionarFecha(dateStr, cardEl) {
             return true;
         })
         .sort((a, b) => a.d - b.d);
+
+    const tratamientoElegido = document.getElementById('tratamiento')?.value || '';
+    const primerSlot = parsed[0];
+    const duracionMin = tratamientoElegido
+        ? getDuracionMinutos(tratamientoElegido, primerSlot?.profesional || '', primerSlot?.sede || '')
+        : null;
+
+    if (duracionMin) {
+        container.innerHTML = '<p class="placeholder-text">Buscando horarios disponibles...</p>';
+        parsed = await filtrarSlotsPorSolapamiento(parsed, dateStr, duracionMin);
+        container.innerHTML = '';
+        if (!parsed.length) {
+            container.innerHTML = '<p class="placeholder-text">No hay horarios con lugar suficiente para este tratamiento en esta fecha.</p>';
+            return;
+        }
+    }
 
     parsed.forEach(slot => {
         const tv = slot.d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ, hour12: false });
@@ -1009,6 +1110,7 @@ async function ejecutarAgendamiento() {
 
     try {
         // 0. Pre-flight: verificar que el slot sigue disponible (anti-solapamiento)
+        const duracionMinPreflight = getDuracionMinutos(tratamiento, slotSeleccionado?.profesional || '', slotSeleccionado?.sede || sedeSeleccionada || '');
         try {
             const startMs = new Date(startTime).getTime();
             const endMs = startMs + 24 * 60 * 60 * 1000;
@@ -1028,6 +1130,38 @@ async function ejecutarAgendamiento() {
         } catch (e) {
             if (/ocupó/i.test(e.message)) throw e;
             // Si falla el check (red, etc.) dejamos continuar para no bloquear innecesariamente
+        }
+
+        // 0b. Pre-flight adicional: GHL calcula "libre" con el slotDuration propio del
+        // calendario, no con la duración real del tratamiento elegido (ver getDuracionMinutos).
+        // Un turno de conducto (45 min) puede dejar "libre" en free-slots un horario que en
+        // realidad cae DENTRO de ese turno ya agendado — el check anterior no lo detecta
+        // porque solo mira si el instante exacto está listado como libre. Acá se compara
+        // contra los turnos reales (con su startTime/endTime reales en GHL) para bloquear
+        // cualquier solapamiento, no solo la coincidencia exacta de horario.
+        if (duracionMinPreflight) {
+            try {
+                const startMs = new Date(startTime).getTime();
+                const endMs = startMs + duracionMinPreflight * 60_000;
+                const rangoDesde = startMs - 24 * 60 * 60 * 1000;
+                const rangoHasta = endMs + 24 * 60 * 60 * 1000;
+                const eventosRes = await ghlFetch(
+                    `calendars/events?calendarId=${slotSeleccionado.calendarId}&startTime=${rangoDesde}&endTime=${rangoHasta}`
+                );
+                const eventos = eventosRes?.events || [];
+                const solapa = eventos.some(ev => {
+                    if (/cancel/i.test(String(ev.appointmentStatus || ''))) return false;
+                    const evStart = new Date(ev.startTime).getTime();
+                    const evEnd = ev.endTime ? new Date(ev.endTime).getTime() : evStart;
+                    return evStart < endMs && evEnd > startMs;
+                });
+                if (solapa) {
+                    throw new Error('Ese horario se superpone con otro turno ya agendado. Elegí otro disponible.');
+                }
+            } catch (e) {
+                if (/superpone/i.test(e.message)) throw e;
+                // Si falla el check (red, etc.) dejamos continuar para no bloquear innecesariamente
+            }
         }
 
         // 1. Buscar o crear contacto en GHL
@@ -1639,6 +1773,34 @@ async function confirmarReagendamiento() {
     setRescheduleStatus(status, 'Reagendando...', 'primary');
 
     try {
+        // 0. Pre-flight anti-solapamiento (mismo problema que al agendar: free-slots
+        // de GHL no sabe que esta duración real puede pisar otro turno ya agendado).
+        // Se excluye el propio turno (se está moviendo, no hay que chocar consigo mismo).
+        try {
+            const endMs = startMs + duracionEfectiva * 60_000;
+            const rangoDesde = startMs - 24 * 60 * 60 * 1000;
+            const rangoHasta = endMs + 24 * 60 * 60 * 1000;
+            const eventosRes = await ghlFetch(
+                `calendars/events?calendarId=${calendarId}&startTime=${rangoDesde}&endTime=${rangoHasta}`
+            );
+            const eventos = eventosRes?.events || [];
+            const solapa = eventos.some(ev => {
+                if (ev.id === appointmentId) return false;
+                if (/cancel/i.test(String(ev.appointmentStatus || ''))) return false;
+                const evStart = new Date(ev.startTime).getTime();
+                const evEnd = ev.endTime ? new Date(ev.endTime).getTime() : evStart;
+                return evStart < endMs && evEnd > startMs;
+            });
+            if (solapa) {
+                setRescheduleStatus(status, 'Ese horario se superpone con otro turno ya agendado. Elegí otro disponible.', 'danger');
+                btn.disabled = false;
+                btn.classList.remove('btn-loading');
+                return;
+            }
+        } catch (_) {
+            // Si falla el check (red, etc.) dejamos continuar para no bloquear innecesariamente
+        }
+
         // 1. PUT a GHL — esto libera el slot anterior automáticamente
         await ghlFetch(`calendars/events/appointments/${appointmentId}`, {
             method: 'PUT',
@@ -1820,7 +1982,7 @@ if (telInput) {
 // =============================================
 // CARGAR TRATAMIENTOS DESDE SUPABASE (por especialidad)
 // =============================================
-async function cargarTratamientosPorEspecialidad(searchKeys, sede, tratamientosCurados = []) {
+async function cargarTratamientosPorEspecialidad(espId, sede, tratamientosCurados = []) {
     const hidden = document.getElementById('tratamiento');
     const tSel = document.getElementById('tratamientoSelect');
     const formContainer = document.getElementById('agendarFormContainer');
@@ -1831,9 +1993,8 @@ async function cargarTratamientosPorEspecialidad(searchKeys, sede, tratamientosC
     formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     try {
-        const sedeNorm = sede.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
         const todos = await getProfesionalesCache();
-        especialidadProfesionalesCache = filtrarPorEspecialidad(todos, searchKeys, sedeNorm);
+        especialidadProfesionalesCache = filtrarPorEspecialidad(todos, espId, sede);
 
         if (!especialidadProfesionalesCache.length) {
             if (tSel) { tSel.innerHTML = '<option value="">No hay profesionales para esta especialidad en esta sede</option>'; tSel.disabled = true; }
@@ -1890,7 +2051,16 @@ async function cargarSlotsDesdeProfs(profs) {
 
 // Listener: cuando cambia el tratamiento en modo especialidad, cargar slots del prof que lo ofrece
 document.getElementById('tratamiento')?.addEventListener('change', function () {
-    if (bookingMode !== 'especialidad') return;
+    if (bookingMode !== 'especialidad') {
+        // Modo profesional/consulta: los slots ya están cargados, solo hay que
+        // re-filtrar la fecha visible por la nueva duración del tratamiento.
+        const fechaActual = document.getElementById('appointmentDate')?.value;
+        if (fechaActual) {
+            const cardEl = document.querySelector('#datePickerContainer .date-card.selected');
+            seleccionarFecha(fechaActual, cardEl);
+        }
+        return;
+    }
     const tratamientoElegido = this.value;
     if (!tratamientoElegido) {
         document.getElementById('datePickerContainer').innerHTML =
@@ -1898,11 +2068,15 @@ document.getElementById('tratamiento')?.addEventListener('change', function () {
         return;
     }
     const tratamientoNorm = normStr(tratamientoElegido);
-    const profsAUsar = especialidadProfesionalesCache.filter(p =>
-        profesionalOfreceTratamiento(p, tratamientoNorm)
+    // Busca en TODOS los profesionales de la sede, no solo en los de la categoría
+    // preseleccionada: la categoría (PROF_ESPECIALIDAD_IDS) es un mapa curado que
+    // puede quedar desactualizado respecto a lo que el profesional realmente ofrece
+    // en Supabase (ej: Ramírez mapeada solo a "odontopediatria" pero su fila tiene
+    // "Consulta general niños" en tratamientos). Lo que importa acá es el tratamiento.
+    const profsAUsar = profesionalesCache.filter(p =>
+        (p.sede || '') === sedeSeleccionada && profesionalOfreceTratamiento(p, tratamientoNorm)
     );
-    // Nunca caer de vuelta a "todos los de la especialidad": si nadie ofrece
-    // este tratamiento puntual, no hay que asignar un profesional que no lo hace
+    // Nunca asignar un profesional que no ofrece el tratamiento puntual
     // (ej: Motta es odontología general pero no atiende consulta para niños).
     if (!profsAUsar.length) {
         document.getElementById('datePickerContainer').innerHTML =

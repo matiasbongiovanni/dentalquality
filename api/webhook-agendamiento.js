@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
     }
 
     const ip = getClientIp(req);
-    if (isRateLimited(ip, 10, 'webhook')) {
+    if (isRateLimited(ip, 30, 'webhook')) {
         res.setHeader('Retry-After', '60');
         return res.status(429).json({ error: 'Demasiadas solicitudes. Intentá de nuevo en un minuto.' });
     }
@@ -44,6 +44,7 @@ module.exports = async (req, res) => {
     const body = req.body;
     const validation = validateAgendamiento(body);
     if (!validation.ok) {
+        console.error('[webhook-agendamiento] payload inválido', validation.errors);
         return res.status(400).json({ error: 'Payload inválido', errors: validation.errors });
     }
 
@@ -57,13 +58,21 @@ module.exports = async (req, res) => {
         dni,
         n8nStatus: result.status,
         n8nOk: result.ok,
+        attempts: result.attempts,
         durationMs: result.durationMs
     }));
 
     if (result.skipped) {
+        console.error('[webhook-agendamiento] N8N_WEBHOOK_URL no configurada');
         return res.status(500).json({ error: 'N8N_WEBHOOK_URL no configurada' });
     }
     if (!result.ok) {
+        console.error('[webhook-agendamiento] n8n no procesó tras reintentos', {
+            appointmentId,
+            n8nStatus: result.status,
+            error: result.error,
+            attempts: result.attempts
+        });
         return res.status(502).json({ error: 'El workflow no procesó la solicitud', n8nStatus: result.status });
     }
 

@@ -38,9 +38,11 @@ module.exports = async (req, res) => {
         return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // Rate limit: 60 req/min per IP on the GHL proxy
+    // Rate limit: 180 req/min per IP on the GHL proxy.
+    // Cargar una especialidad hace 3 requests (chunks de 30 días) x N profesionales
+    // en paralelo — con 60/min un paciente normal tocaba el límite al segundo click.
     const ip = getClientIp(req);
-    if (isRateLimited(ip, 60, 'ghl')) {
+    if (isRateLimited(ip, 180, 'ghl')) {
         res.setHeader('Retry-After', '60');
         return res.status(429).json({ error: 'Demasiadas solicitudes. Intentá de nuevo en un minuto.' });
     }
@@ -66,7 +68,7 @@ module.exports = async (req, res) => {
 
     const queryParams = new URLSearchParams();
     // contacts/search/duplicate requires locationId in query; free-slots rejects it
-    const needsLocationInQuery = GHL_LOCATION_ID && /^contacts\/search\/duplicate/.test(targetPath);
+    const needsLocationInQuery = GHL_LOCATION_ID && /^(contacts\/search\/duplicate|calendars\/events$)/.test(targetPath);
     // contacts and appointments POST/PUT need locationId in body
     const needsLocationInBody = GHL_LOCATION_ID && /^(contacts\/?|calendars\/events\/appointments)/.test(targetPath);
 
