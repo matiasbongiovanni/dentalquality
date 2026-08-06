@@ -122,7 +122,7 @@ const ESPECIALIDADES = [
         label: 'Odontología General',
         desc: 'Consultas, limpiezas y caries',
         searchKey: 'odontolog',
-        tratamientos: ['Consulta general adultos', 'Consulta general niños', 'Limpieza y profilaxis', 'Urgencia'],
+        tratamientos: ['Consulta general adultos', 'Consulta general niños', 'Limpieza y profilaxis'],
     },
     {
         id: 'estetica-dental',
@@ -704,7 +704,7 @@ function onProfesionalChange() {
 
 function onProfesionalCardSelected(prof) {
     const parsed = normalizarTratamientos(prof.tratamientos);
-    const lista = parsed.length ? parsed : ['Consulta general', 'Control / Revisación', 'Urgencia'];
+    const lista = parsed.length ? parsed : ['Consulta general', 'Control / Revisación'];
     poblarTratamientos(lista, prof.profesional || '', prof.sede || '');
     cargarSlotsCalendar(prof.calendar_id);
 }
@@ -919,8 +919,8 @@ function dibujarTarjetasDeDias(container) {
 // realidad caen DENTRO de un turno ya agendado. Acá se traen los eventos reales
 // del/los calendario(s) de ese día y se descartan los slots cuyo rango
 // [inicio, inicio+duración) se superpone con algún turno existente.
-async function filtrarSlotsPorSolapamiento(parsed, dateStr, duracionMin) {
-    if (!duracionMin) return parsed;
+async function filtrarSlotsPorSolapamiento(parsed, dateStr, tratamientoElegido) {
+    if (!tratamientoElegido) return parsed;
     const calendarIds = [...new Set(parsed.map(s => s.calendarId))];
     const dayStart = new Date(`${dateStr}T00:00:00-03:00`).getTime();
     const dayEnd = dayStart + 24 * 60 * 60 * 1000;
@@ -933,7 +933,11 @@ async function filtrarSlotsPorSolapamiento(parsed, dateStr, duracionMin) {
             eventosPorCalendar[calId] = [];
         }
     }));
-    return parsed.filter(slot => {
+    const sinSolapamientoConEventos = parsed.filter(slot => {
+        // Duración propia del profesional/sede de ESTE slot, no la del primero de la lista
+        // (en Lanús "endodoncia-conductos" mezcla varios profesionales en el mismo día).
+        const duracionMin = getDuracionMinutos(tratamientoElegido, slot.profesional || '', slot.sede || '');
+        if (!duracionMin) return true;
         const startMs = slot.d.getTime();
         const endMs = startMs + duracionMin * 60_000;
         const eventos = eventosPorCalendar[slot.calendarId] || [];
@@ -942,6 +946,23 @@ async function filtrarSlotsPorSolapamiento(parsed, dateStr, duracionMin) {
             const evEnd = ev.endTime ? new Date(ev.endTime).getTime() : evStart;
             return evStart < endMs && evEnd > startMs;
         });
+    });
+
+    // Diezmado: GHL devuelve grilla cruda cada slotDuration propio (~29/30 min).
+    // Para un tratamiento de 90 min hay que ofrecer un turno cada 90 min, no cada
+    // 29 — sino dos pacientes podrían ver "libre" ambos 09:00 y 09:29 y el segundo
+    // en verdad caería adentro del turno del primero. Greedy por calendario: toma
+    // el próximo slot libre, descarta todos los que caen dentro de su ventana de
+    // duración, salta al siguiente libre después de esa ventana.
+    const ultimoFinPorCalendar = {};
+    return sinSolapamientoConEventos.filter(slot => {
+        const duracionMin = getDuracionMinutos(tratamientoElegido, slot.profesional || '', slot.sede || '');
+        if (!duracionMin) return true;
+        const startMs = slot.d.getTime();
+        const ultimoFin = ultimoFinPorCalendar[slot.calendarId] || 0;
+        if (startMs < ultimoFin) return false;
+        ultimoFinPorCalendar[slot.calendarId] = startMs + duracionMin * 60_000;
+        return true;
     });
 }
 
@@ -972,14 +993,10 @@ async function seleccionarFecha(dateStr, cardEl) {
         .sort((a, b) => a.d - b.d);
 
     const tratamientoElegido = document.getElementById('tratamiento')?.value || '';
-    const primerSlot = parsed[0];
-    const duracionMin = tratamientoElegido
-        ? getDuracionMinutos(tratamientoElegido, primerSlot?.profesional || '', primerSlot?.sede || '')
-        : null;
 
-    if (duracionMin) {
+    if (tratamientoElegido) {
         container.innerHTML = '<p class="placeholder-text">Buscando horarios disponibles...</p>';
-        parsed = await filtrarSlotsPorSolapamiento(parsed, dateStr, duracionMin);
+        parsed = await filtrarSlotsPorSolapamiento(parsed, dateStr, tratamientoElegido);
         container.innerHTML = '';
         if (!parsed.length) {
             container.innerHTML = '<p class="placeholder-text">No hay horarios con lugar suficiente para este tratamiento en esta fecha.</p>';
@@ -1027,8 +1044,11 @@ document.getElementById('agendarForm')?.addEventListener('submit', function (e) 
         setStatus(status, 'Seleccioná tu obra social o prepaga.');
         return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        setStatus(status, 'Ingresá un email válido.');
+    const emailCheck = validarEmail(email);
+    if (!emailCheck.ok) {
+        setStatus(status, emailCheck.msg);
+        const el = document.getElementById('email');
+        if (el) { el.classList.add('input-invalid'); el.focus(); }
         return;
     }
     if (!/^\d{7,8}$/.test(dni)) {
@@ -1105,6 +1125,23 @@ async function ejecutarAgendamiento() {
     const email     = document.getElementById('email')?.value.trim() || '';
     const tratamiento = document.getElementById('tratamiento').value.trim();
     const startTime = document.getElementById('appointmentTime').value;
+
+    // Revalidar el email acá también: el paciente puede editarlo entre el submit y la
+    // confirmación, y este es el dato con el que se le manda el mail de confirmación.
+    const emailCheck = validarEmail(email);
+    if (!emailCheck.ok) {
+        setStatus(status, emailCheck.msg);
+        cerrarModal('preConfirmModal');
+        const el = document.getElementById('email');
+        if (el) {
+            el.classList.add('input-invalid');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.focus();
+        }
+        const statusForm = document.getElementById('agendarStatus');
+        if (statusForm) setStatus(statusForm, emailCheck.msg);
+        return;
+    }
 
     let appointmentId = null;
 
@@ -1260,8 +1297,8 @@ async function ejecutarAgendamiento() {
         }
         document.getElementById('successModal')?.classList.add('active');
 
-        // Confirmación por email — fire-and-forget
-        if (email) {
+        // Confirmación por email — fire-and-forget (email ya validado arriba)
+        if (validarEmail(email).ok) {
             fetch('/api/send-confirmacion', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1917,6 +1954,85 @@ async function buscarPacientePorDni(dni) {
 // =============================================
 // INPUT FILTERS — robusto
 // =============================================
+
+// Email: validación estricta. Se usa en el submit, en el modal de confirmación
+// (antes de agendar y antes de disparar el mail) y en vivo mientras el paciente tipea.
+const EMAIL_DOMINIOS_TIPICOS = {
+    'gmail.co': 'gmail.com', 'gmail.com.ar': 'gmail.com', 'gmial.com': 'gmail.com',
+    'gmai.com': 'gmail.com', 'gmail.con': 'gmail.com', 'gmail.cm': 'gmail.com',
+    'hotmial.com': 'hotmail.com', 'hotmail.co': 'hotmail.com', 'hotmail.con': 'hotmail.com',
+    'hotmai.com': 'hotmail.com', 'homail.com': 'hotmail.com',
+    'yahoo.co': 'yahoo.com', 'yaho.com': 'yahoo.com',
+    'outlook.co': 'outlook.com', 'outlok.com': 'outlook.com',
+    'live.co': 'live.com'
+};
+
+// Devuelve { ok, msg, sugerencia }
+function validarEmail(raw) {
+    const email = String(raw ?? '').trim();
+
+    if (!email) return { ok: false, msg: 'Ingresá tu email para recibir la confirmación.' };
+    if (/\s/.test(email)) return { ok: false, msg: 'El email no puede tener espacios.' };
+    if (email.length > 254) return { ok: false, msg: 'El email es demasiado largo.' };
+
+    const partes = email.split('@');
+    if (partes.length !== 2) return { ok: false, msg: 'Ingresá un email válido (ej: nombre@gmail.com).' };
+
+    const [local, dominio] = partes;
+    if (!local || local.length > 64) return { ok: false, msg: 'Ingresá un email válido (ej: nombre@gmail.com).' };
+    if (!/^[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+$/.test(local)) return { ok: false, msg: 'El email tiene caracteres no permitidos.' };
+    if (local.startsWith('.') || local.endsWith('.') || local.includes('..')) {
+        return { ok: false, msg: 'Ingresá un email válido (ej: nombre@gmail.com).' };
+    }
+
+    if (!dominio.includes('.')) return { ok: false, msg: 'Falta el dominio del email (ej: @gmail.com).' };
+    if (dominio.startsWith('.') || dominio.endsWith('.') || dominio.includes('..') ||
+        dominio.startsWith('-') || dominio.endsWith('-')) {
+        return { ok: false, msg: 'El dominio del email no es válido.' };
+    }
+    if (!/^[A-Za-z0-9.-]+$/.test(dominio)) return { ok: false, msg: 'El dominio del email no es válido.' };
+
+    const tld = dominio.split('.').pop();
+    if (!/^[A-Za-z]{2,}$/.test(tld)) return { ok: false, msg: 'La terminación del email no es válida (ej: .com, .com.ar).' };
+
+    const sugerencia = EMAIL_DOMINIOS_TIPICOS[dominio.toLowerCase()];
+    if (sugerencia) {
+        return { ok: false, msg: `¿Quisiste decir ${local}@${sugerencia}?`, sugerencia: `${local}@${sugerencia}` };
+    }
+
+    return { ok: true, msg: '' };
+}
+
+// Feedback en vivo del campo email
+const emailInput = document.getElementById('email');
+if (emailInput) {
+    const hintEmail = emailInput.parentElement?.querySelector('.field-hint');
+    const hintOriginal = hintEmail?.textContent || '';
+
+    const pintarEmail = () => {
+        const valor = emailInput.value.trim();
+        if (!valor) {
+            emailInput.classList.remove('input-invalid');
+            if (hintEmail) { hintEmail.textContent = hintOriginal; hintEmail.classList.remove('field-hint-error'); }
+            return;
+        }
+        const r = validarEmail(valor);
+        emailInput.classList.toggle('input-invalid', !r.ok);
+        if (hintEmail) {
+            hintEmail.textContent = r.ok ? hintOriginal : r.msg;
+            hintEmail.classList.toggle('field-hint-error', !r.ok);
+        }
+    };
+
+    // mientras tipea solo limpia el error; al salir del campo valida
+    emailInput.addEventListener('input', () => {
+        if (emailInput.classList.contains('input-invalid')) pintarEmail();
+    });
+    emailInput.addEventListener('blur', () => {
+        emailInput.value = emailInput.value.trim();
+        pintarEmail();
+    });
+}
 
 // DNI: solo dígitos, máximo 8
 function enforceDni(input) {

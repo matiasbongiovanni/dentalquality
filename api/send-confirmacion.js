@@ -14,6 +14,21 @@ function isOriginAllowed(req) {
     return false;
 }
 
+// Espejo de validarEmail() de app.js — la validación del browser no es garantía.
+function esEmailValido(email) {
+    if (!email || /\s/.test(email) || email.length > 254) return false;
+    const partes = email.split('@');
+    if (partes.length !== 2) return false;
+    const [local, dominio] = partes;
+    if (!local || local.length > 64) return false;
+    if (!/^[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+$/.test(local)) return false;
+    if (local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
+    if (!/^[A-Za-z0-9.-]+$/.test(dominio)) return false;
+    if (dominio.startsWith('.') || dominio.endsWith('.') || dominio.includes('..')) return false;
+    if (dominio.startsWith('-') || dominio.endsWith('-')) return false;
+    return /^[A-Za-z]{2,}$/.test(dominio.split('.').pop());
+}
+
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
@@ -36,6 +51,12 @@ module.exports = async (req, res) => {
 
     if (!email) {
         return res.status(200).json({ ok: true, skipped: true, reason: 'sin email' });
+    }
+
+    // No mandar a n8n direcciones inválidas (rebotan y ensucian la reputación del dominio)
+    if (!esEmailValido(email)) {
+        console.warn('[send-confirmacion] email inválido, se descarta el envío');
+        return res.status(400).json({ ok: false, error: 'Email inválido' });
     }
 
     const url = (process.env.N8N_CONFIRMACION_URL || '').trim();
