@@ -23,6 +23,7 @@ function esEmailValido(email) {
     if (!local || local.length > 64) return false;
     if (!/^[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+$/.test(local)) return false;
     if (local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
+    if (!dominio.includes('.')) return false;
     if (!/^[A-Za-z0-9.-]+$/.test(dominio)) return false;
     if (dominio.startsWith('.') || dominio.endsWith('.') || dominio.includes('..')) return false;
     if (dominio.startsWith('-') || dominio.endsWith('-')) return false;
