@@ -4,6 +4,25 @@
 let SUPABASE_URL = '';
 let SUPABASE_HEADERS = {};
 const TZ = 'America/Argentina/Buenos_Aires';
+// Corte de anticipación (Opción A): a partir de esta hora ART, "mañana" deja de
+// tener horarios disponibles para reservar/reprogramar. La validación real (no
+// bypasseable) vive en el servidor (api/_lib/corteAnticipacion.js); esto es solo UX.
+const CORTE_ANTICIPACION_HORA = 15;
+
+function fechaBloqueadaPorCorteAnticipacion(dateStr) {
+    const partes = new Intl.DateTimeFormat('en-CA', {
+        timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false
+    }).formatToParts(new Date());
+    const get = (t) => partes.find(p => p.type === t)?.value;
+    let hora = parseInt(get('hour'), 10);
+    if (hora === 24) hora = 0;
+    const hoy = `${get('year')}-${get('month')}-${get('day')}`;
+    const [y, m, d] = hoy.split('-').map(Number);
+    const mananaDt = new Date(Date.UTC(y, m - 1, d));
+    mananaDt.setUTCDate(mananaDt.getUTCDate() + 1);
+    const manana = mananaDt.toISOString().slice(0, 10);
+    return dateStr === manana && hora >= CORTE_ANTICIPACION_HORA;
+}
 
 async function initConfig() {
     try {
@@ -164,7 +183,7 @@ const ESPECIALIDADES = [
         label: 'Endodoncia y Conductos',
         desc: 'Tratamientos de conducto y endodoncia',
         searchKeys: ['endodoncia', 'conducto'],
-        tratamientos: ['Consulta tratamiento de conducto', 'Retratamiento endodóntico', 'Restauraciones post-endodoncia'],
+        tratamientos: ['Consulta tratamiento de conducto', 'Restauraciones post-endodoncia'],
     },
 ];
 
@@ -284,12 +303,22 @@ async function getProfesionalesCache() {
     return profesionalesCache;
 }
 
+// Conductos/endodoncia bloqueados en sede Lanús, EXCEPTO Ventura (pedido 2026-08-20).
+const VENTURA_CALENDAR_ID = 'FJ3Hma07moKs2EzxTt6N';
+function esConductoTratamiento(tratamiento) {
+    return /conducto|endodoncia|endodont/.test((tratamiento || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''));
+}
+function conductoBloqueadoEnSede(sede, calendarId) {
+    return sede === 'Lanus' && calendarId !== VENTURA_CALENDAR_ID;
+}
+
 // Filtra profesionales por especialidad (id fijo, ver PROF_ESPECIALIDAD_IDS) + sede exacta.
 // Sin matching de texto: si un calendar_id no está en el mapa, no entra a ninguna
 // especialidad (falla cerrado, no abierto — evita el bug de "aparece en todas").
 function filtrarPorEspecialidad(profs, espId, sede) {
     return profs.filter(p => {
         if ((p.sede || '') !== sede) return false;
+        if (espId === 'endodoncia-conductos' && conductoBloqueadoEnSede(sede, p.calendar_id)) return false;
         const ids = PROF_ESPECIALIDAD_IDS[p.calendar_id];
         return !!ids && ids.includes(espId);
     });
@@ -496,12 +525,14 @@ function getDuracionMinutos(tratamiento, profesionalNombre = '', sede = '') {
     if (/consulta.*cirug|cirug.*consulta/.test(t)) return 15;
     if (/consulta\s+tratamiento\s+de\s+conducto/.test(t)) return 15;
     // Conducto/endodoncia → duración por profesional:
-    // Todos → 45 min, excepto Obregón → 25 min y Lescano (Lanús y Lomas) → 90 min
-    // (conducto compuesto, sector posterior/molares — pedido 2026-07-16).
+    // Todos → 45 min, excepto Obregón → 25 min, Lescano (Lanús y Lomas) → 90 min
+    // (conducto compuesto, sector posterior/molares — pedido 2026-07-16) y
+    // Ventura (Lanús) → 30 min (pedido 2026-08-20).
     // endodont* cubre "endodóntico"/"endodontic" (normalizado pierde la tilde)
     if (/conducto|endodoncia|endodont/.test(t)) {
         if (/obregon/.test(p)) return 25;
         if (/lescano/.test(p)) return 90;
+        if (/ventura/.test(p)) return 30;
         return 45;
     }
     // Colocación de implante → 45 min
@@ -703,7 +734,10 @@ function onProfesionalChange() {
 }
 
 function onProfesionalCardSelected(prof) {
-    const parsed = normalizarTratamientos(prof.tratamientos);
+    let parsed = normalizarTratamientos(prof.tratamientos);
+    if (conductoBloqueadoEnSede(prof.sede || '', prof.calendar_id)) {
+        parsed = parsed.filter(t => !esConductoTratamiento(t));
+    }
     const lista = parsed.length ? parsed : ['Consulta general', 'Control / Revisación'];
     poblarTratamientos(lista, prof.profesional || '', prof.sede || '');
     cargarSlotsCalendar(prof.calendar_id);
@@ -854,6 +888,7 @@ function parsearSlots(raw, prof) {
     const collected = [];
     Object.entries(slotsMap).forEach(([dateStr, dayData]) => {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+        if (fechaBloqueadaPorCorteAnticipacion(dateStr)) return;
         const slots = dayData?.slots || dayData;
         if (!Array.isArray(slots)) return;
         slots.forEach(slot => {
@@ -2190,7 +2225,9 @@ document.getElementById('tratamiento')?.addEventListener('change', function () {
     // en Supabase (ej: Ramírez mapeada solo a "odontopediatria" pero su fila tiene
     // "Consulta general niños" en tratamientos). Lo que importa acá es el tratamiento.
     const profsAUsar = profesionalesCache.filter(p =>
-        (p.sede || '') === sedeSeleccionada && profesionalOfreceTratamiento(p, tratamientoNorm)
+        (p.sede || '') === sedeSeleccionada &&
+        profesionalOfreceTratamiento(p, tratamientoNorm) &&
+        !(esConductoTratamiento(tratamientoElegido) && conductoBloqueadoEnSede(p.sede || '', p.calendar_id))
     );
     // Nunca asignar un profesional que no ofrece el tratamiento puntual
     // (ej: Motta es odontología general pero no atiende consulta para niños).
