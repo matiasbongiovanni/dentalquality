@@ -5,7 +5,7 @@ const ALLOWED_PATHS = [
     { pattern: /^calendars\/events\/appointments\/?$/, methods: ['GET', 'POST'] },
     { pattern: /^calendars\/events\/appointments\/[^/]+$/, methods: ['GET', 'PUT', 'PATCH'] },
     { pattern: /^calendars\/[^/]+\/free-slots$/, methods: ['GET'] },
-    { pattern: /^calendars\/[^/]+$/, methods: ['GET'] },
+    { pattern: /^calendars\/[^/]+$/, methods: ['GET', 'PUT'] },
     { pattern: /^calendars\/events$/, methods: ['GET'] },
 ];
 
