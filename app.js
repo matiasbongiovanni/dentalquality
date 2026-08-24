@@ -524,6 +524,8 @@ function getDuracionMinutos(tratamiento, profesionalNombre = '', sede = '') {
     if (/consulta.*implante|implante.*consulta/.test(t)) return 15;
     if (/consulta.*cirug|cirug.*consulta/.test(t)) return 15;
     if (/consulta\s+tratamiento\s+de\s+conducto/.test(t)) return 15;
+    // Ventura (Lanús) — consulta general adultos → 15 min (pedido 2026-08-24).
+    if (/ventura/.test(p) && /consulta general/.test(t)) return 15;
     // Conducto/endodoncia → duración por profesional:
     // Todos → 45 min, excepto Obregón → 25 min, Lescano (Lanús y Lomas) → 90 min
     // (conducto compuesto, sector posterior/molares — pedido 2026-07-16) y
@@ -954,8 +956,59 @@ function dibujarTarjetasDeDias(container) {
 // realidad caen DENTRO de un turno ya agendado. Acá se traen los eventos reales
 // del/los calendario(s) de ese día y se descartan los slots cuyo rango
 // [inicio, inicio+duración) se superpone con algún turno existente.
+// Cuando el tratamiento dura MENOS que la grilla cruda de GHL (ej: "consulta x
+// cirugía" = 15 min pero el calendario solo devuelve horarios cada 30), la web
+// tiene que generar sus propios horarios cada `duracionMin` — GHL nunca ofrece
+// más frecuencia que su propio slotDuration, así que no alcanza con filtrar lo
+// que ya vino. Genera candidatos entre el primer y último horario crudo del día
+// para ese calendario (más un margen de un intervalo nativo al final) y deja que
+// el chequeo de solapamiento contra eventos reales (más abajo) descarte los que
+// no corresponden.
+function expandirSlotsCortos(parsed, tratamientoElegido) {
+    const porCalendario = new Map();
+    parsed.forEach(slot => {
+        if (!porCalendario.has(slot.calendarId)) porCalendario.set(slot.calendarId, []);
+        porCalendario.get(slot.calendarId).push(slot);
+    });
+
+    const resultado = [];
+    porCalendario.forEach(grupo => {
+        grupo.sort((a, b) => a.d - b.d);
+        const template = grupo[0];
+        const duracionMin = getDuracionMinutos(tratamientoElegido, template.profesional || '', template.sede || '');
+
+        let intervaloNativo = 30;
+        const gaps = [];
+        for (let i = 1; i < grupo.length; i++) {
+            const gap = (grupo[i].d.getTime() - grupo[i - 1].d.getTime()) / 60_000;
+            if (gap > 0) gaps.push(gap);
+        }
+        if (gaps.length) intervaloNativo = Math.min(...gaps);
+
+        if (!duracionMin || duracionMin >= intervaloNativo) {
+            resultado.push(...grupo);
+            return;
+        }
+
+        const inicio = grupo[0].d.getTime();
+        const fin = grupo[grupo.length - 1].d.getTime() + intervaloNativo * 60_000;
+        const ahora = Date.now();
+        for (let t = inicio; t < fin; t += duracionMin * 60_000) {
+            if (t <= ahora) continue;
+            const d = new Date(t);
+            resultado.push({
+                ...template,
+                d,
+                iso: d.toISOString()
+            });
+        }
+    });
+    return resultado;
+}
+
 async function filtrarSlotsPorSolapamiento(parsed, dateStr, tratamientoElegido) {
     if (!tratamientoElegido) return parsed;
+    parsed = expandirSlotsCortos(parsed, tratamientoElegido);
     const calendarIds = [...new Set(parsed.map(s => s.calendarId))];
     const dayStart = new Date(`${dateStr}T00:00:00-03:00`).getTime();
     const dayEnd = dayStart + 24 * 60 * 60 * 1000;
@@ -1183,25 +1236,31 @@ async function ejecutarAgendamiento() {
     try {
         // 0. Pre-flight: verificar que el slot sigue disponible (anti-solapamiento)
         const duracionMinPreflight = getDuracionMinutos(tratamiento, slotSeleccionado?.profesional || '', slotSeleccionado?.sede || sedeSeleccionada || '');
-        try {
-            const startMs = new Date(startTime).getTime();
-            const endMs = startMs + 24 * 60 * 60 * 1000;
-            const freshSlots = await ghlFetch(
-                `calendars/${slotSeleccionado.calendarId}/free-slots?startDate=${startMs}&endDate=${endMs}&timezone=${encodeURIComponent(TZ)}`
-            );
-            const dayKey = startTime.slice(0, 10);
-            const dayData = freshSlots?.slots?.[dayKey] || freshSlots?.data?.[dayKey] || freshSlots?.[dayKey];
-            const slotArr = dayData?.slots || (Array.isArray(dayData) ? dayData : []);
-            const stillFree = slotArr.some(s => {
-                const st = s.startTime || s.time || s;
-                return typeof st === 'string' && new Date(st).getTime() === startMs;
-            });
-            if (!stillFree) {
-                throw new Error('Ese horario se ocupó. Elegí otro disponible.');
+        // Este check exige coincidencia EXACTA contra la grilla cruda de GHL — rompe
+        // para horarios "sintéticos" que la web generó más seguido que esa grilla
+        // (tratamientos más cortos que el slotDuration nativo, ver expandirSlotsCortos).
+        // En esos casos el 0b de abajo (chequeo por solapamiento real) ya alcanza.
+        if (!duracionMinPreflight) {
+            try {
+                const startMs = new Date(startTime).getTime();
+                const endMs = startMs + 24 * 60 * 60 * 1000;
+                const freshSlots = await ghlFetch(
+                    `calendars/${slotSeleccionado.calendarId}/free-slots?startDate=${startMs}&endDate=${endMs}&timezone=${encodeURIComponent(TZ)}`
+                );
+                const dayKey = startTime.slice(0, 10);
+                const dayData = freshSlots?.slots?.[dayKey] || freshSlots?.data?.[dayKey] || freshSlots?.[dayKey];
+                const slotArr = dayData?.slots || (Array.isArray(dayData) ? dayData : []);
+                const stillFree = slotArr.some(s => {
+                    const st = s.startTime || s.time || s;
+                    return typeof st === 'string' && new Date(st).getTime() === startMs;
+                });
+                if (!stillFree) {
+                    throw new Error('Ese horario se ocupó. Elegí otro disponible.');
+                }
+            } catch (e) {
+                if (/ocupó/i.test(e.message)) throw e;
+                // Si falla el check (red, etc.) dejamos continuar para no bloquear innecesariamente
             }
-        } catch (e) {
-            if (/ocupó/i.test(e.message)) throw e;
-            // Si falla el check (red, etc.) dejamos continuar para no bloquear innecesariamente
         }
 
         // 0b. Pre-flight adicional: GHL calcula "libre" con el slotDuration propio del
